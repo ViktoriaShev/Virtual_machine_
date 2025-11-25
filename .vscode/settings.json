@@ -1,5 +1,8 @@
 {
     "files.associations": {
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "funcs.h": "c",
+        "stdint.h": "c",
+        "vm32.h": "c"
     }
 }

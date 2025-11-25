@@ -20,21 +20,8 @@
               "icon": "lucide-file",
               "title": "Схема работ"
             }
-          },
-          {
-            "id": "7c4d4da0f1dc38fe",
-            "type": "leaf",
-            "state": {
-              "type": "image",
-              "state": {
-                "file": "Диаграмма вм.png"
-              },
-              "icon": "lucide-image",
-              "title": "Диаграмма вм"
-            }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "vertical"
@@ -182,7 +169,7 @@
       "bases:Create new base": false
     }
   },
-  "active": "7c4d4da0f1dc38fe",
+  "active": "220546249ad3ad8a",
   "lastOpenFiles": [
     "Диаграмма вм.png",
     "Схема работ.md"

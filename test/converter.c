@@ -1,15 +1,5 @@
-// asm2bin.c
 // Простой ассемблер для VM: текст -> binary (32-bit words)
-//
-// Формат инструкции (32 bit):
-//  [ opcode:7 ][ A:8 ][ B:8 ][ C:9 ]
-//
-// Поддерживаются имена инструкций: add, sub, mul, div, mod, expt, abs, sqrt, ln, log,
-// exp, sin, cos, tan, asin, acos, atan, and, or, xor, not, eq, ne, gt, ge, lt, le,
-// time, date, tod, dt, add_time, sub_time, year, month, day, hour, minute, second,
-// len, concat, left, right, mid, insert, delete, replace, ton, tof, tp, ctu, ctd, ctud,
-// limit, sel, mux
-//
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -31,6 +21,7 @@ static OpEntry op_table[] = {
     {"ton",47},{"tof",48},{"tp",49},
     {"ctu",50},{"ctd",51},{"ctud",52},
     {"limit",53},{"sel",54},{"mux",55},
+    {"jmp",56},{"jmp_if",57},{"jmp_if_not",58},
     {NULL,-1}
 };
 
@@ -119,8 +110,15 @@ int main(int argc, char** argv) {
         if (C < 0 || C > 0x1FF) { fprintf(stderr,"Line %lu: C out of range (0..511): %d\n",lineno,C); fclose(in); fclose(out); return 1; }
 
         uint32_t word = ((uint32_t)op << 25) | ((uint32_t)A << 17) | ((uint32_t)B << 9) | ((uint32_t)C);
-        // write as 32-bit little endian (host order is OK for same-arch testing)
-        if (fwrite(&word, sizeof(word), 1, out) != 1) {
+
+        // Для переносимости явно записываем 4 байта в little-endian порядок:
+        uint8_t bytes[4];
+        bytes[0] = (uint8_t)(word & 0xFF);
+        bytes[1] = (uint8_t)((word >> 8) & 0xFF);
+        bytes[2] = (uint8_t)((word >> 16) & 0xFF);
+        bytes[3] = (uint8_t)((word >> 24) & 0xFF);
+
+        if (fwrite(bytes, 1, 4, out) != 4) {
             perror("fwrite");
             fclose(in); fclose(out); return 1;
         }
