@@ -5,6 +5,15 @@
 // funcs.c -- реализация инструкций VM (строки, таймеры, счётчики, арифметика и т.д.)
 #include <string.h>
 #include <stdio.h>
+#include <strings.h> 
+
+TON_Timer ton_timers[16] = {0};
+TOF_Timer tof_timers[16] = {0};
+TP_Timer tp_timers[16] = {0};
+
+CT_Counter ctu_counters[16] = {0};
+CT_Counter ctd_counters[16] = {0};
+CT_Counter ctud_counters[16] = {0};
 
 /* --- Вспомогательные функции безопасности для работы со строками/памятью --- */
 
@@ -491,19 +500,33 @@ void op_mux(uint32_t i) {
     if (addr + 4 > MEM_BYTES) { SetA_val(i, 0); return; }
     SetA_val(i, mr32((uint32_t)addr));
 }
-// JMP-инструкции
+
+// JMP-инструкции теперь изменяют глобальную переменную PC
 void op_jmp(uint32_t i) {
-    reg[RPC] = B_val(i);
+    PC = Bv(i);
 }
 
 void op_jmp_if(uint32_t i) {
-    if (C_val(i)) {
-        reg[RPC] = B_val(i);
+    if (Cv(i)) {
+        PC = Bv(i);
     }
 }
 
 void op_jmp_if_not(uint32_t i) {
-    if (!C_val(i)) {
-        reg[RPC] = B_val(i);
+    if (!Cv(i)) {
+        PC = Bv(i);
     }
+}
+/* ===== Управляющие инструкции ===== */
+
+
+// HALT - останавливает VM
+void op_halt(uint32_t i) {
+    (void)i; // не используется
+    running = false;
+}
+
+// NOP - ничего не делает
+void op_nop(uint32_t i) {
+    (void)i;
 }

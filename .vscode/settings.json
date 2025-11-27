@@ -3,6 +3,7 @@
         "unistd.h": "c",
         "funcs.h": "c",
         "stdint.h": "c",
-        "vm32.h": "c"
+        "vm32.h": "c",
+        "stdbool.h": "c"
     }
 }

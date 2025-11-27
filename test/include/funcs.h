@@ -57,10 +57,10 @@ typedef struct {
 #define RC(i)   (uint32_t)((i) & 0x1FFU)
 
 /* --- Удобные обёртки для operand helpers (A/B/C как в исходнике) --- */
-uint32_t A(uint32_t i) { return RA(i); }       // номер регистра A
-uint32_t Bv(uint32_t i) { return reg[RB(i)]; } // значение B (обычно адрес)
-uint32_t Cv(uint32_t i) { return reg[RC(i)]; } // значение C (число или адрес)
-void SetA_val(uint32_t i, uint32_t v) { reg[RA(i)] = v; }
+static inline  uint32_t A(uint32_t i) { return RA(i); }       // номер регистра A
+static inline  uint32_t Bv(uint32_t i) { return reg[RB(i)]; } // значение B (обычно адрес)
+static inline  uint32_t Cv(uint32_t i) { return reg[RC(i)]; } // значение C (число или адрес)
+static inline void SetA_val(uint32_t i, uint32_t v) { reg[RA(i)] = v; }
 
 
 // Типизированные значения для VM (PLC-like)
@@ -167,4 +167,6 @@ void op_jmp(uint32_t i);
 void op_jmp_if(uint32_t i);
 void op_jmp_if_not(uint32_t i);
 
+void op_halt(uint32_t i);  // НОВАЯ!
+void op_nop(uint32_t i);   // NOP для заполнения
 #endif /* VM32_H */

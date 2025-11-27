@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <strings.h>
 #include <ctype.h>
 
 #define MAX_LINE 512
@@ -22,8 +23,10 @@ static OpEntry op_table[] = {
     {"ctu",50},{"ctd",51},{"ctud",52},
     {"limit",53},{"sel",54},{"mux",55},
     {"jmp",56},{"jmp_if",57},{"jmp_if_not",58},
+    {"halt",59},   // <-- добавлено
     {NULL,-1}
 };
+
 
 static int opcode_from_name(const char* name) {
     for (OpEntry *e = op_table; e->name; e++) {

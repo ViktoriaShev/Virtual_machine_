@@ -29,7 +29,8 @@
 /* количество опкодов (максимум, можно увеличить) */
 #define OPCODE_COUNT   128
 
-#define RPC 0  // или любой индекс 0..255, где будет храниться PC
+/* PC теперь ОТДЕЛЬНАЯ переменная, не в массиве регистров! */
+extern uint32_t PC;
 
 /* ----------------------------
    Глобальные переменные (extern)
@@ -46,6 +47,7 @@ extern uint32_t reg[REG_COUNT];
 /* стартовый адрес PC (в байтах) */
 
 extern uint32_t PC_START;
+extern bool running;
 
 /* указатель на таблицу функций-операций */
 typedef void (*op_ex_f)(uint32_t instruction);
