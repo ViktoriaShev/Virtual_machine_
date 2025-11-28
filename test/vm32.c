@@ -11,6 +11,14 @@
 #include <stdlib.h>
 
 // Конфигурация
+
+vm_config_t vm_config = {
+    .clock_rate_hz = 0,        // 0 = без ограничения
+    .cycle_time_ms = 100,      // 100 мс цикл (типично для ПЛК)
+    .enable_cycle_check = true,  // Отключена проверка перерасхода
+    .enable_hash_check = true    // Отключена проверка хеша
+};
+
 uint32_t PC_START = 0x3000;
 #define MAX_INSTRUCTIONS 100000  // защита от бесконечных циклов
 
@@ -54,7 +62,11 @@ static inline uint32_t pop_pc() {
 
 // Основной цикл выполнения
 void run_program() {
+    struct timespec cycle_start, cycle_end;
     init_logging();
+    reg[0] = 10;
+    reg[1] = 5;
+
     PC = PC_START;
     running = true;
     
@@ -68,6 +80,7 @@ void run_program() {
     uint64_t instr_count = 0;
     
     while (running && instr_count < MAX_INSTRUCTIONS) {
+        clock_gettime(CLOCK_MONOTONIC, &cycle_start);
         // Проверка границ
         if (PC >= MEM_BYTES - 3) {
             printf("PC out of memory bounds (pc=0x%X)\n", PC);
@@ -119,6 +132,21 @@ void run_program() {
         // Периодический вывод прогресса
         if (instr_count % 1000 == 0) {
             printf("  Executed %lu instructions...\n", (unsigned long)instr_count);
+
+        
+        }
+
+        // Ждем до конца цикла
+        clock_gettime(CLOCK_MONOTONIC, &cycle_end);
+        long elapsed_ms = (cycle_end.tv_sec - cycle_start.tv_sec) * 1000 +
+                          (cycle_end.tv_nsec - cycle_start.tv_nsec) / 1000000;
+        
+        long remaining_ms = vm_config.cycle_time_ms - elapsed_ms;
+        
+        if (remaining_ms > 0) {
+            usleep(remaining_ms * 1000);
+        } else if (vm_config.enable_cycle_check) {
+            fprintf(stderr, "WARNING: Cycle overrun by %ld ms\n", -remaining_ms);
         }
     }
     

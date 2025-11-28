@@ -1,12 +1,14 @@
 #define _POSIX_C_SOURCE 199309L
+#include "vm32.h"
 #include "debug.h"
 #include "funcs.h"
+
 #include <string.h>
 #include <time.h>
 
 // Глобальные переменные
 bool logging_enabled = true;
-bool verbose_logging = false;  // по умолчанию выключе
+bool verbose_logging = true;  // по умолчанию выключе
 FILE *log_file = NULL;
 
 // Состояние до выполнения инструкции
@@ -27,7 +29,8 @@ static const char* opcode_names[OPCODE_COUNT] = {
     "TON", "TOF", "TP",
     "CTU", "CTD", "CTUD",
     "LIMIT", "SEL", "MUX",
-    "JMP", "JMP_IF", "JMP_IF_NOT"
+    "JMP", "JMP_IF", "JMP_IF_NOT",
+    "HALT"
 };
 
 const char* opcode_name(uint8_t opcode) {
@@ -51,6 +54,20 @@ void fprintf_inst(FILE *f, uint32_t instr) {
     fprintf(f, "%-10s R%d, R%d, R%d", opcode_name(opcode), ra, rb, rc);
     fprintf(f, "  [0x%08X]", instr);
 }
+
+// Извлекает поля opcode, A, B, C из 32-битного слова
+static inline void disassemble(uint32_t instr,
+                               uint8_t *opcode,
+                               uint8_t *A,
+                               uint8_t *B,
+                               uint16_t *C)
+{
+    *opcode = (instr >> 25) & 0x7F;
+    *A      = (instr >> 17) & 0xFF;
+    *B      = (instr >>  9) & 0xFF;
+    *C      = instr & 0x1FF;
+}
+
 
 void fprintf_mem_bytes(FILE *f, uint8_t *mem, uint32_t from, uint32_t to) {
     fprintf(f, "Memory dump [0x%04X - 0x%04X]:\n", from, to);
@@ -142,9 +159,7 @@ void log_before(uint32_t pc, uint32_t instr) {
     prev_pc = pc;
     memcpy(prev_reg, reg, sizeof(prev_reg));
     memcpy(prev_mem, mem, MEM_LOG_SIZE);
-    
-    // Всегда логируем базовую инфу
-    instruction_count++;
+
     
     // Детальный лог только если включен
     if (!verbose_logging) {

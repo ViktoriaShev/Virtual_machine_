@@ -1,6 +1,9 @@
 
 #ifndef VM_H
 #define VM_H
+
+#include "vm32.h"
+
 #include <time.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -57,10 +60,10 @@ typedef struct {
 #define RC(i)   (uint32_t)((i) & 0x1FFU)
 
 /* --- Удобные обёртки для operand helpers (A/B/C как в исходнике) --- */
-static inline  uint32_t A(uint32_t i) { return RA(i); }       // номер регистра A
-static inline  uint32_t Bv(uint32_t i) { return reg[RB(i)]; } // значение B (обычно адрес)
-static inline  uint32_t Cv(uint32_t i) { return reg[RC(i)]; } // значение C (число или адрес)
-static inline void SetA_val(uint32_t i, uint32_t v) { reg[RA(i)] = v; }
+ inline  uint32_t A(uint32_t i) { return RA(i); }       // номер регистра A
+ inline  uint32_t Bv(uint32_t i) { return reg[RB(i)]; } // значение B (обычно адрес)
+ inline  uint32_t Cv(uint32_t i) { return reg[RC(i)]; } // значение C (число или адрес)
+ inline void SetA_val(uint32_t i, uint32_t v) { reg[RA(i)] = v; }
 
 
 // Типизированные значения для VM (PLC-like)

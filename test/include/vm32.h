@@ -13,9 +13,22 @@
 #include <string.h> /* для memcpy если нужно */
 #include <stddef.h>
 
+typedef struct {
+    uint32_t clock_rate_hz;    // Инструкций в секунду (если нужно)
+    uint32_t cycle_time_ms;    // Время цикла ПЛК
+    bool enable_cycle_check;     // Проверка перерасхода времени цикла
+    bool enable_hash_check;      // Проверка хеша между циклами
+} vm_config_t;
+
+extern vm_config_t vm_config;
+uint32_t simple_hash(const void* data, size_t length);                   // Вычисление хеша данных
+uint32_t calculate_registers_hash();   
 /* ----------------------------
    Конфигурация VM (настраиваемая)
    ---------------------------- */
+#define CLOCK_RATE 100  // 100 инструкций/сек
+
+#define CYCLE_TIME_MS 1000  // 1 секунда на цикл
 
 /* Объём памяти в байтах (64 MiB) */
 #define VM_MEM_BYTES   (64ULL * 1024ULL * 1024ULL)
@@ -52,6 +65,19 @@ extern bool running;
 /* указатель на таблицу функций-операций */
 typedef void (*op_ex_f)(uint32_t instruction);
 extern op_ex_f op_ex[OPCODE_COUNT];
+
+/* ----------------------------
+   Утилиты хеширования
+   ---------------------------- */
+
+/* Вычисляет хеш блока данных (FNV-1a алгоритм) */
+uint32_t simple_hash(const void* data, size_t length);
+
+/* Вычисляет хеш состояния всех регистров */
+uint32_t calculate_registers_hash(void);
+
+/* Вычисляет хеш блока памяти */
+uint32_t calculate_memory_hash(uint32_t start_addr, size_t length);
 
 /* ----------------------------
    Утилиты чтения/записи (байты и слова)
