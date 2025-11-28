@@ -173,6 +173,39 @@ void op_second(uint32_t i) { SetA_val(i, tm_to_tod(current_tm()).seconds); }
 
 /* ===== Строковые функции (безопасно, байтовая память) ===== */
 
+
+// запись нуль-терминированной строки из C в память VM
+// адрес dest берётся из регистра A, длина строки = B, источник строки из reg[C]
+void op_write_string(uint32_t instr) {
+    uint32_t destAddr = reg[RA(instr)];  // регистр A — адрес
+    uint32_t srcAddr  = reg[RB(instr)];  // регистр B — адрес исходной строки в памяти VM
+    uint32_t maxLen   = RC(instr);       // C — максимальная длина записи
+    if (destAddr >= MEM_BYTES || srcAddr >= MEM_BYTES) return;
+
+    size_t src_len = safe_strlen_at(srcAddr);
+    size_t rem = safe_mem_remaining(destAddr);
+    size_t to_copy = src_len;
+    if (to_copy > rem - 1) to_copy = rem - 1;     // оставляем место для '\0'
+    if (to_copy > maxLen) to_copy = maxLen;
+
+    memcpy(mem + destAddr, mem + srcAddr, to_copy);
+    mem[destAddr + to_copy] = '\0';
+}
+
+// запись строки напрямую из встроенного буфера C
+void op_write_const(uint32_t instr, const char *s) {
+    uint32_t destAddr = reg[RA(instr)];  // регистр A — адрес
+    if (!s || destAddr >= MEM_BYTES) return;
+
+    size_t len = strlen(s);
+    size_t rem = safe_mem_remaining(destAddr);
+    if (len > rem - 1) len = rem - 1;
+
+    memcpy(mem + destAddr, s, len);
+    mem[destAddr + len] = '\0';
+}
+
+
 /* Возвращает длину строки по адресу в регистре B */
 void op_len(uint32_t i) {
     uint32_t addr = Bv(i);
