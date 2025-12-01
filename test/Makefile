@@ -11,7 +11,7 @@ all: vm32 converter
 # -------------------------
 #   VM32
 # -------------------------
-VM_OBJS = vm32.o funcs.o debug.o
+VM_OBJS = vm32.o funcs.o debug.o hashing.o timers.o
 
 vm32: $(VM_OBJS)
 	$(CC) $(CFLAGS) -o vm32 $(VM_OBJS) -lm
@@ -25,7 +25,11 @@ funcs.o: funcs.c include/funcs.h include/vm32.h
 debug.o: debug.c include/debug.h include/vm32.h
 	$(CC) $(CFLAGS) -c debug.c
 
+hashing.o: hashing.c include/hashing.h include/vm32.h
+	$(CC) $(CFLAGS) -c hashing.c
 
+timers.o: timers.c include/timers.h include/vm32.h
+	$(CC) $(CFLAGS) -c timers.c
 # -------------------------
 #   Assembler (converter)
 # -------------------------

@@ -4,6 +4,7 @@
         "funcs.h": "c",
         "stdint.h": "c",
         "vm32.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "hashing.h": "c"
     }
 }

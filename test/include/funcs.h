@@ -84,11 +84,6 @@ typedef struct {
     TOD_t  time;
 } DT_t; // DateTime
 
-/* объявляем снаружи, реализация — в единственном .c (например, funcs.c) */
-extern TON_Timer ton_timers[16];
-extern TOF_Timer tof_timers[16];
-extern TP_Timer tp_timers[16];
-
 extern CT_Counter ctu_counters[16];
 extern CT_Counter ctd_counters[16];
 extern CT_Counter ctud_counters[16];

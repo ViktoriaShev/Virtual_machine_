@@ -2,6 +2,7 @@
 #include "vm32.h"
 #include "funcs.h"
 #include "debug.h"
+#include "hashing.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -10,25 +11,37 @@
 #include <string.h>
 #include <stdlib.h>
 
-// Конфигурация
-
+/* ----------------------------
+   Конфигурация VM
+   ---------------------------- */
 vm_config_t vm_config = {
-    .clock_rate_hz = 0,        // 0 = без ограничения
-    .cycle_time_ms = 100,      // 100 мс цикл (типично для ПЛК)
-    .enable_cycle_check = true,  // Отключена проверка перерасхода
-    .enable_hash_check = true    // Отключена проверка хеша
+    .clock_rate_hz = 100,        // 100 инструкций/сек (0 = без ограничения)
+    .cycle_time_ms = 1000,       // 1000 мс = 1 секунда на цикл
+    .enable_cycle_check = true,  // Включена проверка перерасхода
+    .enable_hash_check = true,   // Включена проверка хеша
+    .enable_tick_timing = false , // Отключено (можно включить для медленного выполнения)
+    .hash_algo = HASH_CRC32      // По умолчанию — CRC32 (можно сменить на HASH_FNV1A)
 };
 
+/* ----------------------------
+   Глобальные переменные VM
+   ---------------------------- */
 uint32_t PC_START = 0x3000;
-#define MAX_INSTRUCTIONS 100000  // защита от бесконечных циклов
+#define MAX_INSTRUCTIONS 100000  // Защита от бесконечных циклов
 
-// Глобальные переменные VM
 uint32_t PC = 0;
 uint8_t *mem = NULL;
 uint32_t reg[REG_COUNT] = {0};
 bool running = true;
 
-// Таблица инструкций
+/* Переменные для работы с циклами */
+struct timespec last_tick_time = {0, 0};
+uint32_t cycle_count = 0;
+uint32_t prev_cycle_hash = 0;
+
+/* ----------------------------
+   Таблица инструкций
+   ---------------------------- */
 op_ex_f op_ex[OPCODE_COUNT] = {
     op_add, op_sub, op_mul, op_div, op_mod, op_expt, op_abs, op_sqrt, op_ln, op_log,
     op_exp, op_sin, op_cos, op_tan, op_asin, op_acos, op_atan,
@@ -41,12 +54,13 @@ op_ex_f op_ex[OPCODE_COUNT] = {
     op_ctu, op_ctd, op_ctud,
     op_limit, op_sel, op_mux,
     op_jmp, op_jmp_if, op_jmp_if_not,
-    op_halt, // добавляем HALT
-    op_nop, op_nop, op_nop, op_nop, op_nop, // заполнители
-    // остальные слоты NULL или op_nop
+    op_halt,
+    op_nop, op_nop, op_nop, op_nop, op_nop,
 };
 
-// Стек для PC
+/* ----------------------------
+   Стек для PC
+   ---------------------------- */
 #define PC_STACK_SIZE 256
 uint32_t pc_stack[PC_STACK_SIZE];
 uint32_t pc_stack_ptr = 0;
@@ -55,115 +69,229 @@ static inline void push_pc(uint32_t pc) {
     if (pc_stack_ptr < PC_STACK_SIZE) pc_stack[pc_stack_ptr++] = pc;
 }
 
-static inline uint32_t pop_pc() {
+static inline uint32_t pop_pc(void) {
     if (pc_stack_ptr == 0) return 0;
     return pc_stack[--pc_stack_ptr];
 }
 
-// Основной цикл выполнения
-void run_program() {
-    struct timespec cycle_start, cycle_end;
-    init_logging();
-    reg[0] = 10;
-    reg[1] = 5;
+/* ----------------------------
+   Утилиты работы с временем
+   ---------------------------- */
 
-    PC = PC_START;
-    running = true;
-    
-    if (logging_enabled && log_file) {
-        fprintf(log_file, "Program execution started at PC=0x%04X\n", PC);
-        fprintf(log_file, "Maximum instructions: %d\n\n", MAX_INSTRUCTIONS);
+/* Инициализация системного таймера */
+void init_timer(void) {
+    clock_gettime(CLOCK_MONOTONIC, &last_tick_time);
+}
+
+/* Получение разницы времени в миллисекундах */
+long get_elapsed_ms(struct timespec start, struct timespec end) {
+    return (end.tv_sec - start.tv_sec) * 1000 +
+           (end.tv_nsec - start.tv_nsec) / 1000000;
+}
+
+/* Ожидание следующего такта (если включено ограничение тактовой частоты) */
+void wait_for_tick(void) {
+    if (!vm_config.enable_tick_timing || vm_config.clock_rate_hz == 0) {
+        return;
     }
     
-    printf("Starting VM execution at PC=0x%04X\n", PC);
+    struct timespec current_time;
+    clock_gettime(CLOCK_MONOTONIC, &current_time);
     
-    uint64_t instr_count = 0;
+    // Интервал между тактами в наносекундах
+    long interval_ns = 1000000000 / vm_config.clock_rate_hz;
     
-    while (running && instr_count < MAX_INSTRUCTIONS) {
+    // Прошедшее время с последнего такта
+    long elapsed_ns = (current_time.tv_sec - last_tick_time.tv_sec) * 1000000000 +
+                      (current_time.tv_nsec - last_tick_time.tv_nsec);
+    
+    // Если до следующего такта осталось время - ждем
+    if (elapsed_ns < interval_ns) {
+        long remaining_ns = interval_ns - elapsed_ns;
+        struct timespec sleep_time = {0, remaining_ns};
+        nanosleep(&sleep_time, NULL);
+    }
+    
+    // Фиксируем время начала нового такта
+    clock_gettime(CLOCK_MONOTONIC, &last_tick_time);
+}
+
+/* ----------------------------
+   Основной цикл выполнения
+   ---------------------------- */
+void run_program(void) {
+    struct timespec cycle_start, cycle_end;
+    
+    init_timer();
+    init_logging();
+
+     // ⚠️ Устанавливаем CRC32 для production
+    vm_config.hash_algo = HASH_CRC32;
+    vm_config.enable_hash_check = true;
+    
+    printf("Starting VM execution with cycle-based execution\n");
+    printf("Cycle time: %u ms\n", vm_config.cycle_time_ms);
+    printf("Hash check: %s\n", vm_config.enable_hash_check ? "enabled" : "disabled");
+    printf("Cycle overrun check: %s\n", vm_config.enable_cycle_check ? "enabled" : "disabled");
+    printf("Tick timing: %s\n", vm_config.enable_tick_timing ? "enabled" : "disabled");
+    printf("\n");
+    
+    /* Основной цикл выполнения */
+    while (1) {
+        cycle_count++;
         clock_gettime(CLOCK_MONOTONIC, &cycle_start);
-        // Проверка границ
-        if (PC >= MEM_BYTES - 3) {
-            printf("PC out of memory bounds (pc=0x%X)\n", PC);
-            if (logging_enabled && log_file) {
-                fprintf(log_file, "ERROR: PC out of bounds (0x%X)\n", PC);
-            }
-            break;
+        
+        // Сброс состояния для нового цикла
+        running = true;
+        PC = PC_START;
+        pc_stack_ptr = 0;
+        
+        if (logging_enabled && log_file) {
+            fprintf(log_file, "\n=== CYCLE %u START ===\n", cycle_count);
         }
         
-        uint32_t instr = mr32(PC);
-        
-        // Проверка на пустую память (все нули = конец программы)
-        if (instr == 0 && PC > PC_START) {
-            printf("Reached end of program (all zeros at PC=0x%X)\n", PC);
-            if (logging_enabled && log_file) {
-                fprintf(log_file, "INFO: End of program reached\n");
-            }
-            break;
-        }
-        
-        uint8_t opcode = OPC(instr);
-        
-        if (opcode >= OPCODE_COUNT || op_ex[opcode] == NULL) {
-            printf("Invalid opcode %u at PC=0x%X\n", opcode, PC);
-            if (logging_enabled && log_file) {
-                fprintf(log_file, "ERROR: Invalid opcode %u at PC=0x%X\n", opcode, PC);
-            }
-            break;
-        }
-        
-        uint32_t old_pc = PC;
-        
-        // Логируем ДО выполнения
-        log_before(PC, instr);
-        
-        // Выполняем инструкцию
-        op_ex[opcode](instr);
-        
-        // Если PC не изменился, переходим к следующей инструкции
-        if (PC == old_pc) {
-            PC += 4;
-        }
-        
-        // Логируем ПОСЛЕ выполнения
-        log_after(PC);
-        
-        instr_count++;
-        
-        // Периодический вывод прогресса
-        if (instr_count % 1000 == 0) {
-            printf("  Executed %lu instructions...\n", (unsigned long)instr_count);
+        // Вычисляем хеш состояния регистров перед выполнением цикла
+        uint32_t start_hash = calculate_registers_hash();
 
-        
+        if (logging_enabled && log_file) {
+            fprintf(log_file, "Registers hash at start: 0x%08X\n", start_hash);
         }
 
-        // Ждем до конца цикла
+        // если это первый цикл — и включена проверка, и prev_cycle_hash==0 — инициализируем prev_cycle_hash
+        if (vm_config.enable_hash_check && cycle_count == 1) {
+            prev_cycle_hash = start_hash;
+            if (logging_enabled && log_file) {
+                fprintf(log_file, "Initialized prev_cycle_hash = 0x%08X\n", prev_cycle_hash);
+            }
+        }
+
+
+        
+        /* Выполнение программы до завершения или остановки */
+        uint64_t instr_count = 0;
+        
+        while (running && instr_count < MAX_INSTRUCTIONS) {
+            // Проверка границ памяти
+            if (PC >= MEM_BYTES - 3) {
+                printf("Cycle %u: PC out of memory bounds (0x%X)\n", cycle_count, PC);
+                if (logging_enabled && log_file) {
+                    fprintf(log_file, "ERROR: PC out of bounds (0x%X)\n", PC);
+                }
+                running = false;
+                break;
+            }
+            
+            uint32_t instr = mr32(PC);
+            
+            // Проверка на пустую память (конец программы)
+            if (instr == 0 && PC > PC_START) {
+                if (logging_enabled && log_file) {
+                    fprintf(log_file, "INFO: End of program reached at PC=0x%X\n", PC);
+                }
+                running = false;
+                break;
+            }
+            
+            uint8_t opcode = OPC(instr);
+            
+            // Проверка валидности опкода
+            if (opcode >= OPCODE_COUNT || op_ex[opcode] == NULL) {
+                printf("Cycle %u: Invalid opcode %u at PC=0x%X\n", cycle_count, opcode, PC);
+                if (logging_enabled && log_file) {
+                    fprintf(log_file, "ERROR: Invalid opcode %u at PC=0x%X\n", opcode, PC);
+                }
+                running = false;
+                break;
+            }
+            
+            uint32_t old_pc = PC;
+            
+            // Логируем ДО выполнения
+            log_before(PC, instr);
+            
+            // Выполняем инструкцию
+            op_ex[opcode](instr);
+            
+            // Если PC не изменился, переходим к следующей инструкции
+            if (PC == old_pc) {
+                PC += 4;
+            }
+            
+            // Логируем ПОСЛЕ выполнения
+            log_after(PC);
+            
+            instr_count++;
+            
+            // Ожидание такта (если включено)
+            wait_for_tick();
+            update_all_timers();
+
+        }
+        
+        // Вычисляем хеш состояния регистров после выполнения цикла
+        uint32_t end_hash = calculate_registers_hash();
+
+        if (logging_enabled && log_file) {
+            fprintf(log_file, "Registers hash at end:   0x%08X\n", end_hash);
+        }
+
+        // Проверка на изменение состояния между циклами
+        if (vm_config.enable_hash_check && cycle_count > 1 && end_hash != prev_cycle_hash) {
+            fprintf(log_file, "!!! HASH MISMATCH: Previous end hash was 0x%08X, current end hash 0x%08X\n", prev_cycle_hash, end_hash);
+            printf("!!! HASH MISMATCH detected on cycle %u\n", cycle_count);
+            // Возможные действия: set running=false; trigger fault; for demo — просто логируем.
+        }
+        
+        prev_cycle_hash = end_hash;
+        
+        // Измерение времени выполнения цикла
         clock_gettime(CLOCK_MONOTONIC, &cycle_end);
-        long elapsed_ms = (cycle_end.tv_sec - cycle_start.tv_sec) * 1000 +
-                          (cycle_end.tv_nsec - cycle_start.tv_nsec) / 1000000;
-        
+        long elapsed_ms = get_elapsed_ms(cycle_start, cycle_end);
         long remaining_ms = vm_config.cycle_time_ms - elapsed_ms;
         
+        if (logging_enabled && log_file) {
+            fprintf(log_file, "=== CYCLE %u END: executed %lu instructions in %ld ms ===\n",
+                    cycle_count, (unsigned long)instr_count, elapsed_ms);
+        }
+        
+        printf("Cycle %u: %lu instructions, %ld ms elapsed\n", 
+               cycle_count, (unsigned long)instr_count, elapsed_ms);
+        
+        // Если цикл выполнился быстрее заданного времени - ждем
         if (remaining_ms > 0) {
+            if (logging_enabled && log_file) {
+                fprintf(log_file, "  Waiting for %ld ms to complete cycle\n", remaining_ms);
+            }
             usleep(remaining_ms * 1000);
         } else if (vm_config.enable_cycle_check) {
-            fprintf(stderr, "WARNING: Cycle overrun by %ld ms\n", -remaining_ms);
+            printf("!!! WARNING: Cycle %u overrun by %ld ms\n", cycle_count, -remaining_ms);
+            if (logging_enabled && log_file) {
+                fprintf(log_file, "!!! WARNING: Cycle overrun by %ld ms\n", -remaining_ms);
+            }
         }
-    }
-    
-    if (instr_count >= MAX_INSTRUCTIONS) {
-        printf("WARNING: Instruction limit reached (%d instructions)\n", MAX_INSTRUCTIONS);
+        
+        // Логирование общего времени цикла
         if (logging_enabled && log_file) {
-            fprintf(log_file, "WARNING: Maximum instruction limit reached\n");
+            clock_gettime(CLOCK_MONOTONIC, &cycle_end);
+            long total_cycle_ms = get_elapsed_ms(cycle_start, cycle_end);
+            fprintf(log_file, "  Total cycle time: %ld ms\n", total_cycle_ms);
+        }
+        
+        // Проверка на достижение лимита инструкций
+        if (instr_count >= MAX_INSTRUCTIONS) {
+            printf("WARNING: Instruction limit reached in cycle %u\n", cycle_count);
+            if (logging_enabled && log_file) {
+                fprintf(log_file, "WARNING: Maximum instruction limit reached\n");
+            }
         }
     }
-    
-    printf("VM stopped. Total instructions: %lu, Final PC: 0x%X\n", 
-           (unsigned long)instr_count, PC);
     
     close_logging();
 }
 
-// Загрузка бинарника в память
+/* ----------------------------
+   Загрузка бинарника в память
+   ---------------------------- */
 void load_program(const char *fname) {
     FILE *fp = fopen(fname, "rb");
     if (!fp) {
@@ -176,7 +304,6 @@ void load_program(const char *fname) {
     long fsize = ftell(fp);
     printf("File size: %ld bytes\n", fsize);
     fseek(fp, 0, SEEK_SET);
-
     
     size_t bytes_read = fread(mem + PC_START, 1, MEM_BYTES - PC_START, fp);
     printf("Loaded %zu bytes into memory at 0x%X\n", bytes_read, PC_START);
@@ -186,14 +313,15 @@ void load_program(const char *fname) {
     for (size_t i = 0; i < 3 && (i * 4) < bytes_read; i++) {
         uint32_t instr = mr32(PC_START + i * 4);
         printf("  [0x%04X] 0x%08X - %s\n",
-       (unsigned int)(PC_START + i * 4), instr, opcode_name(OPC(instr)));
-
+               (unsigned int)(PC_START + i * 4), instr, opcode_name(OPC(instr)));
     }
     
     fclose(fp);
 }
 
-// Точка входа
+/* ----------------------------
+   Точка входа
+   ---------------------------- */
 int main(int argc, char **argv) {
     if (argc != 2) {
         printf("Usage: %s <program.bin>\n", argv[0]);
@@ -206,7 +334,9 @@ int main(int argc, char **argv) {
         return 1;
     }
     
-    for (int i = 0; i < REG_COUNT; i++) reg[i] = 0;
+    for (int i = 0; i < REG_COUNT; i++) {
+        reg[i] = 0;
+    }
     
     load_program(argv[1]);
     run_program();

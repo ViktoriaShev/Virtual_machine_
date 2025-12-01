@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 199309L
 #include "vm32.h"
 #include "funcs.h"
-
+#include "timers.h"
 // funcs.c -- реализация инструкций VM (строки, таймеры, счётчики, арифметика и т.д.)
 #include <string.h>
 #include <stdio.h>
@@ -361,95 +361,28 @@ static inline int get_timer_id_from_regA(uint32_t i) {
     return (int)possible;
 }
 
-/* TON: задержка включения
-   - reg[RA] содержит id таймера (0..15)
-   - вход находится в reg[RB]
-   - результат записывается в reg[RA] (0/1) (совместим с ранее используемой семантикой)
-*/
 void op_ton(uint32_t i) {
-    int tid = get_timer_id_from_regA(i);
-    if (tid < 0) return;
-    TON_Timer *t = &ton_timers[tid];
-    bool input = (reg[RB(i)] != 0);
-    if (!t->enabled || t->preset_ms == 0) { reg[RA(i)] = 0; ton_prev_input[tid] = input; return; }
-
-    /* обнаружение фронта 0->1 */
-    if (input && !ton_prev_input[tid]) {
-        clock_gettime(CLOCK_MONOTONIC, &t->start_time);
-    }
-    ton_prev_input[tid] = input;
-
-    if (input) {
-        struct timespec now; clock_gettime(CLOCK_MONOTONIC, &now);
-        uint64_t elapsed = (now.tv_sec - t->start_time.tv_sec) * 1000ULL +
-                           (now.tv_nsec - t->start_time.tv_nsec) / 1000000ULL;
-        t->output = (elapsed >= t->preset_ms);
-    } else {
-        t->output = false;
-    }
-    reg[RA(i)] = t->output ? 1u : 0u;
+    uint8_t id = reg[RA(i)];
+    bool in = reg[RB(i)] != 0;
+    uint32_t pt = reg[RC(i)];
+    ton_set(id, in, pt);
+    reg[RA(i)] = ton_Q(id);
 }
 
-/* TOF: задержка выключения
-   - уставка хранится в t->preset_ms
-   - если вход поднят — выход=1 и таймер не трекается
-   - при спаде входа (1->0) запоминаем время и держим выход=1 пока не истечёт preset
-*/
 void op_tof(uint32_t i) {
-    int tid = get_timer_id_from_regA(i);
-    if (tid < 0) return;
-    TOF_Timer *t = &tof_timers[tid];
-    bool input = (reg[RB(i)] != 0);
-    if (!t->enabled || t->preset_ms == 0) { reg[RA(i)] = 0; tof_prev_input[tid] = input; return; }
-
-    /* при 1 входе — выход сразу 1 */
-    if (input) {
-        t->output = true;
-        /* сбрасываем prev так, чтобы при следующем спаде засечь момент */
-        tof_prev_input[tid] = true;
-    } else {
-        /* detect falling edge: prev==1 && input==0 */
-        if (tof_prev_input[tid]) {
-            clock_gettime(CLOCK_MONOTONIC, &t->start_time);
-        }
-        tof_prev_input[tid] = input;
-        struct timespec now; clock_gettime(CLOCK_MONOTONIC, &now);
-        uint64_t elapsed = (now.tv_sec - t->start_time.tv_sec) * 1000ULL +
-                           (now.tv_nsec - t->start_time.tv_nsec) / 1000000ULL;
-        if (elapsed >= t->preset_ms) t->output = false;
-        /* пока elapsed < preset -> output remains true */
-    }
-    reg[RA(i)] = t->output ? 1u : 0u;
+    uint8_t id = reg[RA(i)];
+    bool in = reg[RB(i)] != 0;
+    uint32_t pt = reg[RC(i)];
+    tof_set(id, in, pt);
+    reg[RA(i)] = tof_Q(id);
 }
 
-/* TP: при фронте 0->1 генерирует импульс длины preset_ms (одноразово пока вход остаётся 1).
-   - опорная логика: на фронте запоминаем время и выставляем output=true; когда elapsed >= preset -> output=false
-*/
 void op_tp(uint32_t i) {
-    int tid = get_timer_id_from_regA(i);
-    if (tid < 0) return;
-    TP_Timer *t = &tp_timers[tid];
-    bool input = (reg[RB(i)] != 0);
-    if (!t->enabled || t->preset_ms == 0) { reg[RA(i)] = 0; tp_prev_input[tid] = input; return; }
-
-    /* detect rising edge */
-    if (input && !tp_prev_input[tid]) {
-        clock_gettime(CLOCK_MONOTONIC, &t->start_time);
-        t->output = true;
-        t->pulse_generated = false;
-    }
-    tp_prev_input[tid] = input;
-
-    if (t->output) {
-        struct timespec now; clock_gettime(CLOCK_MONOTONIC, &now);
-        uint64_t elapsed = (now.tv_sec - t->start_time.tv_sec) * 1000ULL +
-                           (now.tv_nsec - t->start_time.tv_nsec) / 1000000ULL;
-        if (elapsed >= t->preset_ms) {
-            t->output = false;
-            t->pulse_generated = true;
-        }
-    }
-    reg[RA(i)] = t->output ? 1u : 0u;
+    uint8_t id = reg[RA(i)];
+    bool in = reg[RB(i)] != 0;
+    uint32_t pt = reg[RC(i)];
+    tp_set(id, in, pt);
+    reg[RA(i)] = tp_Q(id);
 }
 
 /* ===== Счётчики CTU/CTD/CTUD ===== */
