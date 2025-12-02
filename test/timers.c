@@ -2,6 +2,12 @@
 #include "timers.h"
 #include <string.h>
 
+/* уже имеются: ton_timers, tof_timers, tp_timers ... (они определены здесь) */
+IEC_Timer ton_timers[MAX_TIMERS];
+IEC_Timer tof_timers[MAX_TIMERS];
+IEC_Timer tp_timers[MAX_TIMERS];
+IEC_Timer tonr_timers[MAX_TIMERS];
+IEC_Timer tofr_timers[MAX_TIMERS];
 static inline uint32_t ms_diff(struct timespec *a, struct timespec *b) {
     return (uint32_t)((b->tv_sec - a->tv_sec) * 1000ULL +
                       (b->tv_nsec - a->tv_nsec) / 1000000ULL);
@@ -14,7 +20,6 @@ void timers_init(void) {
     memset(tonr_timers, 0, sizeof(tonr_timers));
     memset(tofr_timers, 0, sizeof(tofr_timers));
 }
-
 /* --- IEC 61131-3 Logics ------------------------------------------------ */
 
 static void update_ton(IEC_Timer *t) {
@@ -180,11 +185,46 @@ void update_all_timers(void) {
 }
 
 /* --- API для инструкций VM -------------------------------------------- */
+static inline bool id_ok(uint8_t id) { return id < MAX_TIMERS; }
 
-#define SETTER(arr) \
-void name(uint8_t id, bool in, uint32_t pt){ \
-    if (id >= MAX_TIMERS) return; \
-    arr[id].input = in; \
-    arr[id].preset_ms = pt; \
-    arr[id].enabled = true; \
+void ton_set(uint8_t id, bool in, uint32_t pt) {
+    if (!id_ok(id)) return;
+    IEC_Timer *t = &ton_timers[id];
+    t->input = in;
+    t->preset_ms = pt;
+    t->enabled = true;
+    update_ton(t);   /* сразу обновим — чтобы op_ton мог тут же получить Q */
+}
+
+bool ton_Q(uint8_t id) {
+    if (!id_ok(id)) return false;
+    return ton_timers[id].output;
+}
+
+void tof_set(uint8_t id, bool in, uint32_t pt) {
+    if (!id_ok(id)) return;
+    IEC_Timer *t = &tof_timers[id];
+    t->input = in;
+    t->preset_ms = pt;
+    t->enabled = true;
+    update_tof(t);
+}
+
+bool tof_Q(uint8_t id) {
+    if (!id_ok(id)) return false;
+    return tof_timers[id].output;
+}
+
+void tp_set(uint8_t id, bool in, uint32_t pt) {
+    if (!id_ok(id)) return;
+    IEC_Timer *t = &tp_timers[id];
+    t->input = in;
+    t->preset_ms = pt;
+    t->enabled = true;
+    update_tp(t);
+}
+
+bool tp_Q(uint8_t id) {
+    if (!id_ok(id)) return false;
+    return tp_timers[id].output;
 }

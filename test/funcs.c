@@ -2,14 +2,12 @@
 #include "vm32.h"
 #include "funcs.h"
 #include "timers.h"
+#include "cleanup.h"
 // funcs.c -- реализация инструкций VM (строки, таймеры, счётчики, арифметика и т.д.)
 #include <string.h>
 #include <stdio.h>
 #include <strings.h> 
 
-TON_Timer ton_timers[16] = {0};
-TOF_Timer tof_timers[16] = {0};
-TP_Timer tp_timers[16] = {0};
 
 CT_Counter ctu_counters[16] = {0};
 CT_Counter ctd_counters[16] = {0};
@@ -349,11 +347,6 @@ void op_replace(uint32_t i) {
 
 /* ===== Таймеры (TON/TOF/TP) — IEC-style, с детекцией фронтов ===== */
 
-/* prev input arrays для детектирования фронтов */
-static bool ton_prev_input[16] = {0};
-static bool tof_prev_input[16] = {0};
-static bool tp_prev_input[16]  = {0};
-
 /* Helper: получить timer id из регистра A (значение в регистре) */
 static inline int get_timer_id_from_regA(uint32_t i) {
     uint32_t possible = reg[RA(i)];
@@ -362,79 +355,88 @@ static inline int get_timer_id_from_regA(uint32_t i) {
 }
 
 void op_ton(uint32_t i) {
-    uint8_t id = reg[RA(i)];
+    int id = (int)reg[RA(i)];
+    if (id < 0 || id >= MAX_TIMERS) return;
     bool in = reg[RB(i)] != 0;
     uint32_t pt = reg[RC(i)];
-    ton_set(id, in, pt);
-    reg[RA(i)] = ton_Q(id);
+    ton_set((uint8_t)id, in, pt);
+    reg[RA(i)] = ton_Q((uint8_t)id) ? 1 : 0;
 }
 
 void op_tof(uint32_t i) {
-    uint8_t id = reg[RA(i)];
+    int id = (int)reg[RA(i)];
+    if (id < 0 || id >= MAX_TIMERS) return;
     bool in = reg[RB(i)] != 0;
     uint32_t pt = reg[RC(i)];
-    tof_set(id, in, pt);
-    reg[RA(i)] = tof_Q(id);
+    tof_set((uint8_t)id, in, pt);
+    reg[RA(i)] = tof_Q((uint8_t)id) ? 1 : 0;
 }
 
 void op_tp(uint32_t i) {
-    uint8_t id = reg[RA(i)];
+    int id = (int)reg[RA(i)];
+    if (id < 0 || id >= MAX_TIMERS) return;
     bool in = reg[RB(i)] != 0;
     uint32_t pt = reg[RC(i)];
-    tp_set(id, in, pt);
-    reg[RA(i)] = tp_Q(id);
+    tp_set((uint8_t)id, in, pt);
+    reg[RA(i)] = tp_Q((uint8_t)id) ? 1 : 0;
 }
+
 
 /* ===== Счётчики CTU/CTD/CTUD ===== */
 
 /* prev inputs для CU/CD */
-static bool ctu_prev[16] = {0};
-static bool ctd_prev[16] = {0};
+static bool ctu_prev_input[MAX_TIMERS] = {0};
+static bool ctd_prev_input[MAX_TIMERS] = {0};
+static bool ctud_prev_up[MAX_TIMERS] = {0};
+static bool ctud_prev_down[MAX_TIMERS] = {0};
 
-/* CTU: регистр A содержит индекс счётчика (в reg[RA]), вход CU in reg[RB] */
+
 void op_ctu(uint32_t i) {
-    uint32_t idx = reg[RA(i)];
-    if (idx >= 16) return;
-    bool in = (reg[RB(i)] != 0);
-    if (in && !ctu_prev[idx]) {
-        ctu_counters[idx].value++;
+    int id = (int)reg[RA(i)];
+    if (id < 0 || id >= MAX_TIMERS) return;
+    bool in = reg[RB(i)] != 0;
+    uint32_t preset = reg[RC(i)];
+    bool rising = in && !ctu_prev_input[id];
+    if (rising) {
+        if (ctu_counters[id].value < UINT32_MAX) ctu_counters[id].value++;
     }
-    ctu_prev[idx] = in;
-    reg[RA(i)] = ctu_counters[idx].value;
+    ctu_prev_input[id] = in;
+    /* Запишем Q (напр., 1 если value >= preset) в рег A */
+    reg[RA(i)] = (ctu_counters[id].value >= preset) ? 1 : 0;
 }
 
-/* CTD: регистр A содержит индекс счётчика (в reg[RA]), вход CD in reg[RB] */
 void op_ctd(uint32_t i) {
-    uint32_t idx = reg[RA(i)];
-    if (idx >= 16) return;
-    bool in = (reg[RB(i)] != 0);
-    if (in && !ctd_prev[idx]) {
-        if (ctd_counters[idx].value > 0) ctd_counters[idx].value--;
+    int id = (int)reg[RA(i)];
+    if (id < 0 || id >= MAX_TIMERS) return;
+    bool in = reg[RB(i)] != 0;
+    uint32_t preset = reg[RC(i)];
+    bool rising = in && !ctd_prev_input[id];
+    if (rising) {
+        if (ctd_counters[id].value > 0) ctd_counters[id].value--;
     }
-    ctd_prev[idx] = in;
-    reg[RA(i)] = ctd_counters[idx].value;
+    ctd_prev_input[id] = in;
+    reg[RA(i)] = (ctd_counters[id].value <= preset) ? 1 : 0;
 }
 
-/* CTUD: A contains counter index (reg[RA]), RB is CU input, RC is CD input */
 void op_ctud(uint32_t i) {
-    uint32_t idx = reg[RA(i)];
-    if (idx >= 16) return;
-    bool cu = (reg[RB(i)] != 0);
-    bool cd = (reg[RC(i)] != 0);
-
-    /* detect rising edges */
-    if (cu && !ctu_prev[idx]) ctu_counters[idx].value++;
-    if (cd && !ctd_prev[idx]) {
-        if (ctd_counters[idx].value < 0xFFFFFFFFu) ctd_counters[idx].value++;
+    int id = (int)reg[RA(i)];
+    if (id < 0 || id >= MAX_TIMERS) return;
+    bool up = reg[RB(i)] != 0;
+    bool down = reg[RC(i)] != 0;
+    bool up_rising = up && !ctud_prev_up[id];
+    bool down_rising = down && !ctud_prev_down[id];
+    if (up_rising) {
+        if (ctud_counters[id].value < UINT32_MAX) ctud_counters[id].value++;
     }
-    ctu_prev[idx] = cu;
-    ctd_prev[idx] = cd;
-
-    /* reg gets difference (up - down) */
-    uint32_t up = ctu_counters[idx].value;
-    uint32_t down = ctd_counters[idx].value;
-    reg[RA(i)] = (up >= down) ? (up - down) : 0; /* saturate at 0 */
+    if (down_rising) {
+        if (ctud_counters[id].value > 0) ctud_counters[id].value--;
+    }
+    ctud_prev_up[id] = up;
+    ctud_prev_down[id] = down;
+    /* Возвращаем текущее значение в рег A (или можно возвращать Q по preset) */
+    reg[RA(i)] = ctud_counters[id].value;
 }
+
 
 /* ===== limit / sel / mux (используют mr32 для чтения 32-bit слов в памяти) ===== */
 
@@ -490,9 +492,36 @@ void op_jmp_if_not(uint32_t i) {
 void op_halt(uint32_t i) {
     (void)i; // не используется
     running = false;
+    atomic_store(&vm_stop_requested, true);
 }
 
 // NOP - ничего не делает
 void op_nop(uint32_t i) {
     (void)i;
+}
+
+
+void op_exit(uint32_t i) {
+
+    int code = 0;
+
+    // если A == 0 — immediate код EXIT (в C)
+    // если A != 0 — берём из регистра
+    if (RA(i) == 0) {
+        // immediate stored in C
+        code = (i & 0x1FF);
+    } else {
+        code = A(i);
+    }
+
+    vm_exit_code = code;
+
+    // run cleanups
+    run_cleanups();
+
+    // stop this cycle
+    running = false;
+
+    // stop the whole VM
+    atomic_store(&vm_stop_requested, true);
 }

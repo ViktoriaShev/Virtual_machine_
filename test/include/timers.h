@@ -32,25 +32,16 @@ void timers_init(void);
 /* Вызывается раз в цикл VM */
 void update_all_timers(void);
 
-/* Интерфейс для инструкций */
-void ton_set(uint8_t id, bool in, uint32_t preset_ms);
-void tof_set(uint8_t id, bool in, uint32_t preset_ms);
-void tp_set(uint8_t id, bool in, uint32_t preset_ms);
-void tonr_set(uint8_t id, bool in, uint32_t preset_ms);
-void tofr_set(uint8_t id, bool in, uint32_t preset_ms);
-
-/* Чтение выхода */
+/* --- Простые API для инструкций VM --------------------------------- */
+/* Устанавливают вход/pt и включают таймер (и сразу обновляют его),
+   чтобы op_* мог установить вход и тут же прочитать Q. */
+void ton_set(uint8_t id, bool in, uint32_t pt);
 bool ton_Q(uint8_t id);
-bool tof_Q(uint8_t id);
-bool tp_Q(uint8_t id);
-bool tonr_Q(uint8_t id);
-bool tofr_Q(uint8_t id);
 
-/* Чтение ET */
-uint32_t ton_ET(uint8_t id);
-uint32_t tof_ET(uint8_t id);
-uint32_t tp_ET(uint8_t id);
-uint32_t tonr_ET(uint8_t id);
-uint32_t tofr_ET(uint8_t id);
+void tof_set(uint8_t id, bool in, uint32_t pt);
+bool tof_Q(uint8_t id);
+
+void tp_set(uint8_t id, bool in, uint32_t pt);
+bool tp_Q(uint8_t id);
 
 #endif

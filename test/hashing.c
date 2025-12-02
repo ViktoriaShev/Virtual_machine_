@@ -22,20 +22,6 @@ uint32_t simple_hash(const void* data, size_t length) {
     
     return hash;
 }
-
-/* Вычисляет хеш состояния всех регистров */
-uint32_t calculate_registers_hash(void) {
-    return simple_hash(reg, sizeof(reg));
-}
-
-/* Вычисляет хеш блока памяти */
-uint32_t calculate_memory_hash(uint32_t start_addr, size_t length) {
-    if (start_addr + length > MEM_BYTES) {
-        length = MEM_BYTES - start_addr;
-    }
-    return simple_hash(mem + start_addr, length);
-}
-
 /* ============================================================================
    CRC32 (IEEE 802.3 / Ethernet polynomial) Implementation
    
@@ -166,7 +152,7 @@ uint32_t calculate_registers_hash(void) {
     if (REG_COUNT == 0) return 0;
 #endif
 
-    if (&vm_config && vm_config.hash_algo == HASH_SIMPLE_FNV1A) {
+    if (vm_config.hash_algo == HASH_SIMPLE_FNV1A) {
         return simple_hash((const void*)reg, sizeof(reg));
     } else {
         /* По умолчанию — CRC32 */
@@ -184,7 +170,7 @@ uint32_t calculate_memory_hash(uint32_t start_addr, size_t length) {
         length = MEM_BYTES - start_addr;
     }
 
-    if (&vm_config && vm_config.hash_algo == HASH_SIMPLE_FNV1A) {
+    if (vm_config.hash_algo == HASH_SIMPLE_FNV1A) {
         return simple_hash(mem + start_addr, length);
     } else {
         return crc32_memory(mem, start_addr, length);

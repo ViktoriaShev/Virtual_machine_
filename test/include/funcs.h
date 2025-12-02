@@ -165,6 +165,7 @@ void op_jmp(uint32_t i);
 void op_jmp_if(uint32_t i);
 void op_jmp_if_not(uint32_t i);
 
+void op_exit(uint32_t i);
 void op_halt(uint32_t i);  // НОВАЯ!
 void op_nop(uint32_t i);   // NOP для заполнения
 #endif /* VM32_H */

@@ -3,6 +3,8 @@
 #include "funcs.h"
 #include "debug.h"
 #include "hashing.h"
+#include "cleanup.h"
+#include "timers.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -10,7 +12,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
-
+#include <signal.h>
 /* ----------------------------
    Конфигурация VM
    ---------------------------- */
@@ -54,8 +56,9 @@ op_ex_f op_ex[OPCODE_COUNT] = {
     op_ctu, op_ctd, op_ctud,
     op_limit, op_sel, op_mux,
     op_jmp, op_jmp_if, op_jmp_if_not,
+    op_exit,
     op_halt,
-    op_nop, op_nop, op_nop, op_nop, op_nop,
+    op_nop, 
 };
 
 /* ----------------------------
@@ -72,6 +75,11 @@ static inline void push_pc(uint32_t pc) {
 static inline uint32_t pop_pc(void) {
     if (pc_stack_ptr == 0) return 0;
     return pc_stack[--pc_stack_ptr];
+}
+
+void handle_sigterm(int sig) {
+    (void)sig;
+    atomic_store(&vm_stop_requested, true);
 }
 
 /* ----------------------------
@@ -145,7 +153,18 @@ void run_program(void) {
         running = true;
         PC = PC_START;
         pc_stack_ptr = 0;
-        
+
+        if (atomic_load(&vm_stop_requested)) {
+
+            /* If exit() already set exit_code — leave it */
+            if (vm_exit_code == 0) {
+                vm_exit_code = 0; // normal shutdown
+            }
+
+            run_cleanups();
+            break;
+        }
+
         if (logging_enabled && log_file) {
             fprintf(log_file, "\n=== CYCLE %u START ===\n", cycle_count);
         }
@@ -323,6 +342,8 @@ void load_program(const char *fname) {
    Точка входа
    ---------------------------- */
 int main(int argc, char **argv) {
+    signal(SIGINT, handle_sigterm);
+    signal(SIGTERM, handle_sigterm);
     if (argc != 2) {
         printf("Usage: %s <program.bin>\n", argv[0]);
         return 1;
@@ -337,10 +358,12 @@ int main(int argc, char **argv) {
     for (int i = 0; i < REG_COUNT; i++) {
         reg[i] = 0;
     }
-    
+
+    timers_init();
+
     load_program(argv[1]);
     run_program();
     
     free(mem);
-    return 0;
+    return vm_exit_code;
 }

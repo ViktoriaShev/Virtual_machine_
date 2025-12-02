@@ -23,10 +23,12 @@ static OpEntry op_table[] = {
     {"ctu",50},{"ctd",51},{"ctud",52},
     {"limit",53},{"sel",54},{"mux",55},
     {"jmp",56},{"jmp_if",57},{"jmp_if_not",58},
-    {"halt",59},  
+    // NEW: exit opcode
+    {"exit",59},
+    // HALT now 60 (or any other free number)
+    {"halt",60},
     {NULL,-1}
 };
-
 
 static int opcode_from_name(const char* name) {
     for (OpEntry *e = op_table; e->name; e++) {
@@ -56,11 +58,20 @@ static int parse_operand(const char *tok, int *out) {
     }
 }
 
+
 int main(int argc, char** argv) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <input.asm> <output.bin>\n", argv[0]);
+
+    int raw_halt = 0;
+
+    if (argc < 3) {
+        fprintf(stderr, "Usage: %s <input.asm> <output.bin> [--raw-halt]\n", argv[0]);
         return 1;
     }
+
+    // optional flag
+    if (argc >= 4 && strcmp(argv[3],"--raw-halt")==0)
+        raw_halt = 1;
+
     FILE *in = fopen(argv[1], "r");
     if (!in) { perror("fopen input"); return 1; }
     FILE *out = fopen(argv[2], "wb");
@@ -68,8 +79,10 @@ int main(int argc, char** argv) {
 
     char line[MAX_LINE];
     unsigned long lineno = 0;
+
     while (fgets(line, sizeof(line), in)) {
         lineno++;
+
         // trim leading spaces
         char *p = line;
         while (*p && isspace((unsigned char)*p)) p++;
@@ -78,13 +91,19 @@ int main(int argc, char** argv) {
 
         // remove trailing newline
         char *nl = strchr(p, '\n'); if (nl) *nl = '\0';
-        // remove inline comments starting with ';' or '#'
+        // remove inline comments
         char *cpos = strpbrk(p, ";#");
         if (cpos) *cpos = '\0';
 
         // tokenize
         char *tok = strtok(p, " \t,");
         if (!tok) continue;
+
+        // auto-map HALT -> EXIT 0 (unless raw-halt)
+        if (!raw_halt && strcasecmp(tok, "halt") == 0) {
+            tok = "exit";  // rewrite
+        }
+
         int op = opcode_from_name(tok);
         if (op < 0) {
             fprintf(stderr, "Line %lu: unknown opcode '%s'\n", lineno, tok);
@@ -114,7 +133,6 @@ int main(int argc, char** argv) {
 
         uint32_t word = ((uint32_t)op << 25) | ((uint32_t)A << 17) | ((uint32_t)B << 9) | ((uint32_t)C);
 
-        // Для переносимости явно записываем 4 байта в little-endian порядок:
         uint8_t bytes[4];
         bytes[0] = (uint8_t)(word & 0xFF);
         bytes[1] = (uint8_t)((word >> 8) & 0xFF);
@@ -130,5 +148,9 @@ int main(int argc, char** argv) {
     fclose(in);
     fclose(out);
     printf("Assembled %s -> %s\n", argv[1], argv[2]);
+    if (raw_halt)
+        printf("RAW HALT mode enabled: HALT remains HALT\n");
+    else
+        printf("Default mode: HALT mapped to EXIT 0\n");
     return 0;
 }
