@@ -50,22 +50,21 @@ typedef struct {
     uint32_t preset;
 } CT_Counter;
 
-
-/* маски/шаблоны декодирования (формат инструкции):
-   [ opcode:7 ][ A:8 ][ B:8 ][ C:9 ]  (всего 32 бита)
-*/
+/* Формат инструкции: [ opcode:7 ][ A:8 ][ B:8 ][ IMM:1 ][ C:8 ] */
 #define OPC(i)  (uint8_t)(((i) >> 25) & 0x7F)
 #define RA(i)   (uint8_t)(((i) >> 17) & 0xFF)
 #define RB(i)   (uint8_t)(((i) >> 9) & 0xFF)
-#define RC(i)   (uint32_t)((i) & 0x1FFU)
+#define RC(i)   (uint32_t)((i) & 0xFF)           // Теперь только 8 бит!
 
-/* Макросы для декодирования immediate-операндов */
-#define FIMM(i)     (((i) >> 8) & 1)           // бит режима immediate (в позиции 8)
-#define IMM9(i)     ((i) & 0x1FF)              // 9-битный immediate (поле C)
-#define SEXTIMM9(i) sext((i) & 0x1FF, 9)       // знаковое расширение 9 бит
+/* Флаг immediate (бит 8) */
+#define FIMM(i) (((i) >> 8) & 1)
 
-// Получение значения C: либо из регистра, либо immediate
-#define Cv_or_imm(i) (FIMM(i) ? SEXTIMM9(i) : Cv(i))
+/* 8-битный immediate с знаковым расширением */
+#define IMM8(i)     ((i) & 0xFF)
+#define SEXTIMM8(i) sext((i) & 0xFF, 8)
+
+/* Получение значения C: либо регистр (0-255), либо immediate (-128..+127) */
+#define Cv_or_imm(i) (FIMM(i) ? SEXTIMM8(i) : reg[RC(i)])
 
 /* --- Удобные обёртки для operand helpers (A/B/C как в исходнике) --- */
  inline  uint32_t A(uint32_t i) { return RA(i); }       // номер регистра A
@@ -74,6 +73,7 @@ typedef struct {
  inline void SetA_val(uint32_t i, uint32_t v) { reg[RA(i)] = v; }
 
 /* Функция знакового расширения */
+/* Знаковое расширение */
 static inline uint32_t sext(uint32_t n, int b) {
     return ((n >> (b - 1)) & 1) ? (n | (0xFFFFFFFF << b)) : n;
 }

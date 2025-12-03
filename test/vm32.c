@@ -183,8 +183,6 @@ void run_program(void) {
                 fprintf(log_file, "Initialized prev_cycle_hash = 0x%08X\n", prev_cycle_hash);
             }
         }
-
-
         
         /* Выполнение программы до завершения или остановки */
         uint64_t instr_count = 0;
@@ -244,7 +242,6 @@ void run_program(void) {
             // Ожидание такта (если включено)
             wait_for_tick();
             update_all_timers();
-
         }
         
         // Вычисляем хеш состояния регистров после выполнения цикла
