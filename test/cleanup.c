@@ -8,9 +8,9 @@ int vm_exit_code = 0;
 
 Cleanup *cleanup_list = NULL;
 
-/* ============================
+/*
    Register cleanup callback
-   ============================ */
+  */
 
 void vm_register_cleanup(cleanup_fn fn, void *ctx) {
     if (!fn) return;
@@ -21,9 +21,9 @@ void vm_register_cleanup(cleanup_fn fn, void *ctx) {
     cleanup_list = n;
 }
 
-/* ============================
+/* 
    Run cleanups once
-   ============================ */
+*/
 
 void run_cleanups(void) {
     Cleanup *c = cleanup_list;
@@ -33,9 +33,9 @@ void run_cleanups(void) {
     }
 }
 
-/* ============================
+/* 
    External stop request
-   ============================ */
+ */
 
 void vm_request_stop(void) {
     atomic_store(&vm_stop_requested, true);

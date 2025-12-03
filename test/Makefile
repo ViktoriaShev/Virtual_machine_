@@ -1,62 +1,49 @@
-# -------------------------
-#   Makefile for VM + Assembler
-# -------------------------
+# Компилятор и флаги
+CC      := gcc
+CFLAGS  := -std=c11 -O2 -Wall -Wextra -Iinclude
+LDFLAGS := -lm -latomic
 
-CC      = gcc
-CFLAGS  = -std=c11 -O2 -Wall -Wextra -Iinclude
+# Директория сборки
+BUILD_DIR := build
 
-# Основные цели
-all: vm32 converter
+# Исходники для vm32
+VM_SRCS := vm32.c funcs.c debug.c hashing.c timers.c cleanup.c
+VM_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(VM_SRCS))
+VM_TARGET := $(BUILD_DIR)/vm32
 
-# -------------------------
-#   VM32
-# -------------------------
-VM_OBJS = vm32.o funcs.o debug.o hashing.o timers.o cleanup.o
+# Исходники для converter
+CONVERTER_SRCS := converter.c
+CONVERTER_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(CONVERTER_SRCS))
+CONVERTER_TARGET := $(BUILD_DIR)/converter
 
-vm32: $(VM_OBJS)
-	$(CC) $(CFLAGS) -o vm32 $(VM_OBJS) -lm
+# -------------------------------
+# Правила сборки
+# -------------------------------
 
-vm32.o: vm32.c include/vm32.h include/funcs.h include/debug.h
-	$(CC) $(CFLAGS) -c vm32.c
+all: $(BUILD_DIR) $(VM_TARGET) $(CONVERTER_TARGET)
 
-funcs.o: funcs.c include/funcs.h include/vm32.h
-	$(CC) $(CFLAGS) -c funcs.c
+# Создание директории build, если не существует
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
 
-debug.o: debug.c include/debug.h include/vm32.h
-	$(CC) $(CFLAGS) -c debug.c
+# Компиляция бинарника vm32
+$(VM_TARGET): $(VM_OBJS)
+	$(CC) $(CFLAGS) -o $@ $(VM_OBJS) $(LDFLAGS)
 
-hashing.o: hashing.c include/hashing.h include/vm32.h
-	$(CC) $(CFLAGS) -c hashing.c
+# Компиляция бинарника converter
+$(CONVERTER_TARGET): $(CONVERTER_OBJS)
+	$(CC) $(CFLAGS) -o $@ $(CONVERTER_OBJS)
 
-timers.o: timers.c include/timers.h include/vm32.h
-	$(CC) $(CFLAGS) -c timers.c
+# Компиляция объектного файла в build/
+$(BUILD_DIR)/%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-cleanup.o: timers.c include/cleanup.h include/vm32.h
-	$(CC) $(CFLAGS) -c cleanup.c
-# -------------------------
-#   Assembler (converter)
-# -------------------------
-converter: converter.o
-	$(CC) $(CFLAGS) -o converter converter.o
-
-converter.o: converter.c include/vm32.h
-	$(CC) $(CFLAGS) -c converter.c
-
-
-# -------------------------
-#   Доп. цели
-# -------------------------
-
-# перекомпиляция всех
-rebuild: clean all
-
-# Удаление объектов и бинарников
+# Очистка build
 clean:
-	rm -f *.o vm32 converter program.bin
+	rm -rf $(BUILD_DIR)
 
-# Удобство: собрать program.asm → program.bin
-build-bin: converter program.asm
-	./converter program.asm program.bin
-	@echo "✓ program.bin создан"
+# Сборка для отладки (debug)
+debug: CFLAGS += -g -O0
+debug: clean all
 
-.PHONY: all clean rebuild build-bin
+.PHONY: all clean debug

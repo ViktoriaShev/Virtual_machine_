@@ -59,13 +59,24 @@ typedef struct {
 #define RB(i)   (uint8_t)(((i) >> 9) & 0xFF)
 #define RC(i)   (uint32_t)((i) & 0x1FFU)
 
+/* Макросы для декодирования immediate-операндов */
+#define FIMM(i)     (((i) >> 8) & 1)           // бит режима immediate (в позиции 8)
+#define IMM9(i)     ((i) & 0x1FF)              // 9-битный immediate (поле C)
+#define SEXTIMM9(i) sext((i) & 0x1FF, 9)       // знаковое расширение 9 бит
+
+// Получение значения C: либо из регистра, либо immediate
+#define Cv_or_imm(i) (FIMM(i) ? SEXTIMM9(i) : Cv(i))
+
 /* --- Удобные обёртки для operand helpers (A/B/C как в исходнике) --- */
  inline  uint32_t A(uint32_t i) { return RA(i); }       // номер регистра A
  inline  uint32_t Bv(uint32_t i) { return reg[RB(i)]; } // значение B (обычно адрес)
  inline  uint32_t Cv(uint32_t i) { return reg[RC(i)]; } // значение C (число или адрес)
  inline void SetA_val(uint32_t i, uint32_t v) { reg[RA(i)] = v; }
 
-
+/* Функция знакового расширения */
+static inline uint32_t sext(uint32_t n, int b) {
+    return ((n >> (b - 1)) & 1) ? (n | (0xFFFFFFFF << b)) : n;
+}
 // Типизированные значения для VM (PLC-like)
 typedef struct {
     int32_t hours;   // 0..23

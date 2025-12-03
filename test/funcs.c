@@ -92,15 +92,32 @@ static int32_t tod_to_seconds(TOD_t t) {
     return t.hours*3600 + t.minutes*60 + t.seconds;
 }
 
-/* ----- арифметика (целочисленная) ----- */
-void op_add(uint32_t i) { SetA_val(i, Bv(i) + Cv(i)); }
-void op_sub(uint32_t i) { SetA_val(i, Bv(i) - Cv(i)); }
-void op_mul(uint32_t i) { SetA_val(i, Bv(i) * Cv(i)); }
-void op_div(uint32_t i) { uint32_t c = Cv(i); SetA_val(i, c ? Bv(i)/c : 0); }
-void op_mod(uint32_t i) { uint32_t c = Cv(i); SetA_val(i, c ? Bv(i)%c : 0); }
+void op_add(uint32_t i) { 
+    SetA_val(i, Bv(i) + Cv_or_imm(i)); 
+}
 
-/* Математические функции используют double -> результат приводим к uint32_t. */
-void op_expt(uint32_t i) { SetA_val(i, (uint32_t)pow((double)Bv(i),(double)Cv(i))); }
+void op_sub(uint32_t i) { 
+    SetA_val(i, Bv(i) - Cv_or_imm(i)); 
+}
+
+void op_mul(uint32_t i) { 
+    SetA_val(i, Bv(i) * Cv_or_imm(i)); 
+}
+
+void op_div(uint32_t i) { 
+    uint32_t c = Cv_or_imm(i); 
+    SetA_val(i, c ? Bv(i)/c : 0); 
+}
+
+void op_mod(uint32_t i) { 
+    uint32_t c = Cv_or_imm(i); 
+    SetA_val(i, c ? Bv(i)%c : 0); 
+}
+
+void op_expt(uint32_t i) { 
+    SetA_val(i, (uint32_t)pow((double)Bv(i), (double)Cv_or_imm(i))); 
+}
+
 void op_abs(uint32_t i)  { SetA_val(i, (uint32_t)abs((int32_t)Bv(i))); }
 void op_sqrt(uint32_t i) { SetA_val(i, (uint32_t)sqrt((double)Bv(i))); }
 void op_ln(uint32_t i)   { SetA_val(i, (uint32_t)log((double)Bv(i))); }
@@ -114,19 +131,20 @@ void op_acos(uint32_t i) { SetA_val(i, (uint32_t)acos((double)Bv(i))); }
 void op_atan(uint32_t i) { SetA_val(i, (uint32_t)atan((double)Bv(i))); }
 
 /* ----- логика ----- */
-void op_and(uint32_t i) { SetA_val(i, Bv(i) & Cv(i)); }
-void op_or(uint32_t i)  { SetA_val(i, Bv(i) | Cv(i)); }
-void op_xor(uint32_t i) { SetA_val(i, Bv(i) ^ Cv(i)); }
+void op_and(uint32_t i) { SetA_val(i, Bv(i) & Cv_or_imm(i)); }
+void op_or(uint32_t i)  { SetA_val(i, Bv(i) | Cv_or_imm(i)); }
+void op_xor(uint32_t i) { SetA_val(i, Bv(i) ^ Cv_or_imm(i)); }
 void op_not(uint32_t i) { SetA_val(i, ~Bv(i)); }
+
 
 /* ----- сравнения ----- */
 // все операции сравнения записывают результат прямо в регистр A
-void op_eq(uint32_t i) { SetA_val(i, Bv(i) == Cv(i) ? 1 : 0); }
-void op_ne(uint32_t i) { SetA_val(i, Bv(i) != Cv(i) ? 1 : 0); }
-void op_gt(uint32_t i) { SetA_val(i, Bv(i) >  Cv(i) ? 1 : 0); }
-void op_ge(uint32_t i) { SetA_val(i, Bv(i) >= Cv(i) ? 1 : 0); }
-void op_lt(uint32_t i) { SetA_val(i, Bv(i) <  Cv(i) ? 1 : 0); }
-void op_le(uint32_t i) { SetA_val(i, Bv(i) <= Cv(i) ? 1 : 0); }
+void op_eq(uint32_t i) { SetA_val(i, Bv(i) == Cv_or_imm(i) ? 1 : 0); }
+void op_ne(uint32_t i) { SetA_val(i, Bv(i) != Cv_or_imm(i) ? 1 : 0); }
+void op_gt(uint32_t i) { SetA_val(i, Bv(i) >  Cv_or_imm(i) ? 1 : 0); }
+void op_ge(uint32_t i) { SetA_val(i, Bv(i) >= Cv_or_imm(i) ? 1 : 0); }
+void op_lt(uint32_t i) { SetA_val(i, Bv(i) <  Cv_or_imm(i) ? 1 : 0); }
+void op_le(uint32_t i) { SetA_val(i, Bv(i) <= Cv_or_imm(i) ? 1 : 0); }
 
 
 /* ----- время / дата (заглушки) ----- */
@@ -150,15 +168,14 @@ void op_tod(uint32_t i) {
 void op_dt(uint32_t i) {
     DT_t dt = tm_to_dt(current_tm());
     SetA_val(i, dt.date.year*1000000 + dt.date.month*10000 + dt.date.day*100 + dt.time.hours); 
-    // усечённо, можно расширить до uint64, если нужно
 }
 
 void op_add_time(uint32_t i) {
-    SetA_val(i, Bv(i) + Cv(i));
+    SetA_val(i, Bv(i) + Cv_or_imm(i));
 }
 
 void op_sub_time(uint32_t i) {
-    SetA_val(i, Bv(i) - Cv(i));
+    SetA_val(i, Bv(i) - Cv_or_imm(i));
 }
 
 // Отдельные компоненты даты/времени
@@ -232,26 +249,22 @@ void op_concat(uint32_t i) {
 /* LEFT: первые n символов строки по адресу B, in-place */
 void op_left(uint32_t i) {
     uint32_t addr = Bv(i);
-    uint32_t n = Cv(i);
+    uint32_t n = Cv_or_imm(i);  // Может быть immediate
     if (addr >= MEM_BYTES) return;
     size_t len = safe_strlen_at(addr);
-    if ((size_t)n >= len) return; /* ничего не делаем */
-    /* сдвигаем первые n байт в начало (они уже там) и ставим '\0' */
+    if ((size_t)n >= len) return;
     if (addr + n < MEM_BYTES) mem[addr + n] = '\0';
 }
 
 /* RIGHT: последние n символов строки по адресу B, in-place */
 void op_right(uint32_t i) {
     uint32_t addr = Bv(i);
-    uint32_t n = Cv(i);
+    uint32_t n = Cv_or_imm(i);  // Может быть immediate
     if (addr >= MEM_BYTES) return;
     size_t len = safe_strlen_at(addr);
     if (len == 0) return;
-    if ((size_t)n >= len) { /* оставляем всю строку */
-        return;
-    }
+    if ((size_t)n >= len) return;
     uint32_t src = addr + (uint32_t)(len - n);
-    /* memmove на себя */
     safe_memmove(addr, src, n);
     if (addr + n < MEM_BYTES) mem[addr + n] = '\0';
 }
@@ -260,10 +273,10 @@ void op_right(uint32_t i) {
    mid(s, start) => s := s[start..end] */
 void op_mid(uint32_t i) {
     uint32_t addr = Bv(i);
-    uint32_t start = Cv(i);
+    uint32_t start = Cv_or_imm(i);  // Может быть immediate
     if (addr >= MEM_BYTES) return;
     size_t len = safe_strlen_at(addr);
-    if ((size_t)start >= len) { /* результирующая пустая строка */
+    if ((size_t)start >= len) {
         if (addr < MEM_BYTES) mem[addr] = '\0';
         return;
     }
@@ -276,30 +289,22 @@ void op_mid(uint32_t i) {
 /* INSERT: в строку по адресу reg[RA] вставить текст из строки по адресу reg[RB] в позицию pos=C */
 void op_insert(uint32_t i) {
     uint32_t destAddr = reg[RA(i)];
-    uint32_t insAddr  = Bv(i); // reg[RB]
-    uint32_t pos      = Cv(i);
+    uint32_t insAddr  = Bv(i);
+    uint32_t pos      = Cv_or_imm(i);  // Может быть immediate
     if (destAddr >= MEM_BYTES || insAddr >= MEM_BYTES) return;
     size_t dest_len = safe_strlen_at(destAddr);
     size_t ins_len = safe_strlen_at(insAddr);
     if ((size_t)pos > dest_len) pos = (uint32_t)dest_len;
     size_t rem = safe_mem_remaining(destAddr);
     if (rem == 0) return;
-    /* сколько свободно для вставки (включая nul) */
     size_t max_insert = rem > dest_len ? rem - dest_len - 1 : 0;
     size_t to_insert = ins_len < max_insert ? ins_len : max_insert;
-    /* сдвинем хвост вправо */
     if (to_insert > 0) {
         size_t tail = dest_len - pos;
-        /* убедимся, что destAddr+pos+to_insert+tail <= MEM_BYTES */
         if (destAddr + pos + to_insert + tail + 1 > MEM_BYTES) {
-            /* уменьшим tail/insert, но проще — отрежем вставку */
-            if (destAddr + pos + to_insert + 1 > MEM_BYTES) {
-                /* нечего вставить */
-                return;
-            }
+            if (destAddr + pos + to_insert + 1 > MEM_BYTES) return;
         }
-        /* memmove вправо */
-        memmove(mem + destAddr + pos + to_insert, mem + destAddr + pos, tail + 1); /* +1 чтобы скопировать '\0' */
+        memmove(mem + destAddr + pos + to_insert, mem + destAddr + pos, tail + 1);
         memcpy(mem + destAddr + pos, mem + insAddr, to_insert);
     }
 }
@@ -307,20 +312,20 @@ void op_insert(uint32_t i) {
 /* DELETE: удалить n=C символов с позиции pos=B в строке по адресу reg[RA] */
 void op_delete(uint32_t i) {
     uint32_t addr = reg[RA(i)];
-    uint32_t pos = Bv(i);
-    uint32_t n = Cv(i);
+    uint32_t pos = Bv(i);  // Может быть адрес из регистра
+    uint32_t n = Cv_or_imm(i);  // Может быть immediate
     if (addr >= MEM_BYTES) return;
     size_t len = safe_strlen_at(addr);
     if (pos >= len) return;
     if ((size_t)n > len - pos) n = (uint32_t)(len - pos);
-    safe_memmove(addr + pos, addr + pos + n, len - pos - n + 1); /* +1 чтобы копировать '\0' */
+    safe_memmove(addr + pos, addr + pos + n, len - pos - n + 1);
 }
 
 /* REPLACE: в строке по адресу reg[RA] заменить n=C символов с позиции pos=B на строку по адресу reg[RB] */
 void op_replace(uint32_t i) {
     uint32_t addr = reg[RA(i)];
     uint32_t repAddr = Bv(i);
-    uint32_t pos = Cv(i);
+    uint32_t pos = Cv_or_imm(i); 
     if (addr >= MEM_BYTES || repAddr >= MEM_BYTES) return;
     size_t len = safe_strlen_at(addr);
     size_t rep_len = safe_strlen_at(repAddr);
@@ -358,7 +363,7 @@ void op_ton(uint32_t i) {
     int id = (int)reg[RA(i)];
     if (id < 0 || id >= MAX_TIMERS) return;
     bool in = reg[RB(i)] != 0;
-    uint32_t pt = reg[RC(i)];
+    uint32_t pt = Cv_or_imm(i);
     ton_set((uint8_t)id, in, pt);
     reg[RA(i)] = ton_Q((uint8_t)id) ? 1 : 0;
 }
@@ -367,7 +372,7 @@ void op_tof(uint32_t i) {
     int id = (int)reg[RA(i)];
     if (id < 0 || id >= MAX_TIMERS) return;
     bool in = reg[RB(i)] != 0;
-    uint32_t pt = reg[RC(i)];
+     uint32_t pt = Cv_or_imm(i);
     tof_set((uint8_t)id, in, pt);
     reg[RA(i)] = tof_Q((uint8_t)id) ? 1 : 0;
 }
@@ -376,7 +381,7 @@ void op_tp(uint32_t i) {
     int id = (int)reg[RA(i)];
     if (id < 0 || id >= MAX_TIMERS) return;
     bool in = reg[RB(i)] != 0;
-    uint32_t pt = reg[RC(i)];
+    uint32_t pt = Cv_or_imm(i);
     tp_set((uint8_t)id, in, pt);
     reg[RA(i)] = tp_Q((uint8_t)id) ? 1 : 0;
 }
@@ -395,7 +400,7 @@ void op_ctu(uint32_t i) {
     int id = (int)reg[RA(i)];
     if (id < 0 || id >= MAX_TIMERS) return;
     bool in = reg[RB(i)] != 0;
-    uint32_t preset = reg[RC(i)];
+    uint32_t preset = Cv_or_imm(i); 
     bool rising = in && !ctu_prev_input[id];
     if (rising) {
         if (ctu_counters[id].value < UINT32_MAX) ctu_counters[id].value++;
@@ -409,7 +414,7 @@ void op_ctd(uint32_t i) {
     int id = (int)reg[RA(i)];
     if (id < 0 || id >= MAX_TIMERS) return;
     bool in = reg[RB(i)] != 0;
-    uint32_t preset = reg[RC(i)];
+    uint32_t preset = Cv_or_imm(i); 
     bool rising = in && !ctd_prev_input[id];
     if (rising) {
         if (ctd_counters[id].value > 0) ctd_counters[id].value--;
@@ -443,7 +448,7 @@ void op_ctud(uint32_t i) {
 void op_limit(uint32_t i) {
     uint32_t x = reg[RA(i)];
     uint32_t lo = Bv(i);
-    uint32_t hi = Cv(i);
+    uint32_t hi = Cv_or_imm(i);
     if (x < lo) x = lo;
     if (x > hi) x = hi;
     SetA_val(i, x);
@@ -463,7 +468,7 @@ void op_sel(uint32_t i) {
 /* MUX: base address in B, idx in C (index of 32-bit word), returns mr32(base + idx*4) */
 void op_mux(uint32_t i) {
     uint32_t base = Bv(i);
-    uint32_t idx = Cv(i);
+    uint32_t idx = Cv_or_imm(i);
     uint64_t addr = (uint64_t)base + (uint64_t)idx * 4ULL;
     if (addr + 4 > MEM_BYTES) { SetA_val(i, 0); return; }
     SetA_val(i, mr32((uint32_t)addr));
@@ -471,20 +476,21 @@ void op_mux(uint32_t i) {
 
 // JMP-инструкции теперь изменяют глобальную переменную PC
 void op_jmp(uint32_t i) {
-    PC = Bv(i);
+    PC = FIMM(i) ? SEXTIMM9(i) : Bv(i);
 }
 
 void op_jmp_if(uint32_t i) {
-    if (Cv(i)) {
-        PC = Bv(i);
+    if (Cv(i)) {  // Условие всегда из регистра
+        PC = FIMM(i) ? SEXTIMM9(i) : Bv(i);
     }
 }
 
 void op_jmp_if_not(uint32_t i) {
-    if (!Cv(i)) {
-        PC = Bv(i);
+    if (!Cv(i)) {  // Условие всегда из регистра
+        PC = FIMM(i) ? SEXTIMM9(i) : Bv(i);
     }
 }
+
 /* ===== Управляющие инструкции ===== */
 
 
@@ -500,28 +506,19 @@ void op_nop(uint32_t i) {
     (void)i;
 }
 
-
 void op_exit(uint32_t i) {
-
     int code = 0;
-
-    // если A == 0 — immediate код EXIT (в C)
-    // если A != 0 — берём из регистра
+    
+    // Если A == 0, код выхода берётся из immediate (C)
+    // Если A != 0, код берётся из регистра A
     if (RA(i) == 0) {
-        // immediate stored in C
-        code = (i & 0x1FF);
+        code = (int)IMM9(i);  // Immediate из поля C
     } else {
-        code = A(i);
+        code = (int)A(i);
     }
 
     vm_exit_code = code;
-
-    // run cleanups
     run_cleanups();
-
-    // stop this cycle
     running = false;
-
-    // stop the whole VM
     atomic_store(&vm_stop_requested, true);
 }
