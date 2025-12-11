@@ -33,6 +33,7 @@ static const char* opcode_names[OPCODE_COUNT] = {
     "HALT", "EXIT"
 };
 
+
 const char* opcode_name(uint8_t opcode) {
     if (opcode >= OPCODE_COUNT) return "UNKNOWN";
     return opcode_names[opcode];
