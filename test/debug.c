@@ -30,7 +30,7 @@ static const char* opcode_names[OPCODE_COUNT] = {
     "CTU", "CTD", "CTUD",
     "LIMIT", "SEL", "MUX",
     "JMP", "JMP_IF", "JMP_IF_NOT",
-    "HALT"
+    "HALT", "EXIT"
 };
 
 const char* opcode_name(uint8_t opcode) {

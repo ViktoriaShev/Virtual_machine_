@@ -92,6 +92,8 @@ static int32_t tod_to_seconds(TOD_t t) {
     return t.hours*3600 + t.minutes*60 + t.seconds;
 }
 
+// Арифметика 
+
 void op_add(uint32_t i) { 
     SetA_val(i, Bv(i) + Cv_or_imm(i)); 
 }
@@ -476,18 +478,18 @@ void op_mux(uint32_t i) {
 
 // JMP-инструкции теперь изменяют глобальную переменную PC
 void op_jmp(uint32_t i) {
-    PC = FIMM(i) ? SEXTIMM9(i) : Bv(i);
+    PC = FIMM(i) ? SEXTIMM8(i) : Bv(i);
 }
 
 void op_jmp_if(uint32_t i) {
     if (Cv(i)) {  // Условие всегда из регистра
-        PC = FIMM(i) ? SEXTIMM9(i) : Bv(i);
+        PC = FIMM(i) ? SEXTIMM8(i) : Bv(i);
     }
 }
 
 void op_jmp_if_not(uint32_t i) {
     if (!Cv(i)) {  // Условие всегда из регистра
-        PC = FIMM(i) ? SEXTIMM9(i) : Bv(i);
+        PC = FIMM(i) ? SEXTIMM8(i) : Bv(i);
     }
 }
 
@@ -512,7 +514,7 @@ void op_exit(uint32_t i) {
     // Если A == 0, код выхода берётся из immediate (C)
     // Если A != 0, код берётся из регистра A
     if (RA(i) == 0) {
-        code = (int)IMM9(i);  // Immediate из поля C
+        code = (int)IMM8(i);  // Immediate из поля C
     } else {
         code = (int)A(i);
     }

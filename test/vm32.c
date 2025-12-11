@@ -339,6 +339,7 @@ void load_program(const char *fname) {
    Точка входа
    ---------------------------- */
 int main(int argc, char **argv) {
+
     signal(SIGINT, handle_sigterm);
     signal(SIGTERM, handle_sigterm);
     if (argc != 2) {
@@ -355,6 +356,9 @@ int main(int argc, char **argv) {
     for (int i = 0; i < REG_COUNT; i++) {
         reg[i] = 0;
     }
+    
+    reg[0] = 5;
+    reg[1] = 3;
 
     timers_init();
 
