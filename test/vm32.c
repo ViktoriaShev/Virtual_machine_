@@ -1,4 +1,5 @@
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 200809L  // можно и без этого, если не требуется
+
 #include "vm32.h"
 #include "funcs.h"
 #include "debug.h"
@@ -9,10 +10,10 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
-#include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
 #include <signal.h>
+
 /* ----------------------------
    Конфигурация VM
    ---------------------------- */
@@ -170,7 +171,7 @@ void run_program(void) {
         }
         
         // Вычисляем хеш состояния регистров перед выполнением цикла
-        uint32_t start_hash = calculate_registers_hash();
+        uint32_t start_hash = calculate_registers_hash(reg, REG_COUNT);
 
         if (logging_enabled && log_file) {
             fprintf(log_file, "Registers hash at start: 0x%08X\n", start_hash);
@@ -245,7 +246,7 @@ void run_program(void) {
         }
         
         // Вычисляем хеш состояния регистров после выполнения цикла
-        uint32_t end_hash = calculate_registers_hash();
+        uint32_t end_hash = calculate_registers_hash(reg, REG_COUNT);
 
         if (logging_enabled && log_file) {
             fprintf(log_file, "Registers hash at end:   0x%08X\n", end_hash);
@@ -300,6 +301,10 @@ void run_program(void) {
                 fprintf(log_file, "WARNING: Maximum instruction limit reached\n");
             }
         }
+
+        if (verify_data_integrity(reg, sizeof(reg), end_hash)) {
+            printf("Registers integrity OK\n");
+    }
     }
     
     close_logging();

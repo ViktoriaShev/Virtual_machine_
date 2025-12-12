@@ -1,5 +1,5 @@
 ╔═══════════════════════════════════════════════════════════════╗
-║           VM32 Execution Log - Tue Dec  9 19:45:46 2025
+║           VM32 Execution Log - Fri Dec 12 12:28:00 2025
 ╠═══════════════════════════════════════════════════════════════╣
 ║ Memory: 67108864 bytes (64.00 MB)
 ║ Registers: 256
@@ -1157,9 +1157,9 @@ Initialized prev_cycle_hash = 0xC021911A
 └──────────────────────────────────────────────────────────────
 
 Registers hash at end:   0x0D2252D7
-=== CYCLE 1 END: executed 66 instructions in 1 ms ===
-  Waiting for 999 ms to complete cycle
-  Total cycle time: 1000 ms
+=== CYCLE 1 END: executed 66 instructions in 0 ms ===
+  Waiting for 1000 ms to complete cycle
+  Total cycle time: 1001 ms
 
 ╔═══════════════════════════════════════════════════════════════╗
 ║ Execution Summary

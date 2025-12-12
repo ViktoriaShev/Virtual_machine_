@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 200809L  // можно и без этого, если не требуется
 #include "vm32.h"
 #include "funcs.h"
 #include "timers.h"
