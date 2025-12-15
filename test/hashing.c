@@ -465,10 +465,6 @@ const value_type_t ptr_value_type = {
     .del = ptr_free
 };
 
-/* ----------------------------
-   VM32 Utility Functions
-   ---------------------------- */
-
 uint32_t calculate_registers_hash(const uint32_t *registers, size_t count) {
     return crc32(registers, count * sizeof(uint32_t));
 }
