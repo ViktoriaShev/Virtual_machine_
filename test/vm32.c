@@ -38,9 +38,19 @@ uint32_t reg[REG_COUNT] = {0};
 bool running = true;
 
 /* Переменные для работы с циклами */
+
+/* Program integrity */
+static uint32_t program_hash = 0;
+static size_t program_size = 0;
+
 struct timespec last_tick_time = {0, 0};
 uint32_t cycle_count = 0;
 uint32_t prev_cycle_hash = 0;
+
+/* globals */
+static hash_table_t *labels = NULL;
+static hash_table_t *breakpoints = NULL;
+static hash_table_t *decoded_cache = NULL;
 
 /* ----------------------------
    Таблица инструкций
@@ -61,6 +71,99 @@ op_ex_f op_ex[OPCODE_COUNT] = {
     op_halt,
     op_nop, 
 };
+
+/* ----------------------------
+   Кеш декодированных инструкций
+   ---------------------------- */
+
+/* Декодирование с использованием кеша.
+ * Если запись есть в decoded_cache по адресу addr — вернём её.
+ * Иначе: выделим decoded_instr_t, заполним поля и сохраним в decoded_cache.
+ */
+static decoded_instr_t *decode_instruction(uint32_t addr) {
+    if (!decoded_cache) return NULL;
+
+    uint32_t key = addr;
+    decoded_instr_t *cached = (decoded_instr_t *)hash_table_lookup(decoded_cache, &key);
+    if (cached) {
+        return cached;
+    }
+
+    /* Безопасность: убедимся, что адрес в пределах памяти */
+    if (addr >= MEM_BYTES - 3) return NULL;
+
+    uint32_t instr = mr32(addr);
+
+    /* Проверка "пустой" инструкции можно оставить вызывающему */
+    decoded_instr_t *dec = (decoded_instr_t *)malloc(sizeof(decoded_instr_t));
+    if (!dec) {
+        fprintf(stderr, "decode_instruction: malloc failed\n");
+        return NULL;
+    }
+
+    dec->raw_instr = instr;
+    dec->opcode = OPC(instr);
+    dec->ra = RA(instr);
+    dec->rb = RB(instr);
+    dec->rc = RC(instr);
+    dec->has_immediate = FIMM(instr);
+    dec->immediate = dec->has_immediate ? IMM8(instr) : 0;
+
+    /* Сохраняем в кеш — hash_table_insert скопирует ключ (uint32_copy),
+       а для значения используется ptr_copy (как задано в vm_tables_init),
+       поэтому передаём указатель на структуру. */
+    hash_table_insert(decoded_cache, &key, dec);
+
+    return dec;
+}
+
+/* Уничтожение/очистка всех таблиц, вызывается при завершении программы.
+   Учитывает, что decoded_cache value_type.del == free, поэтому освобождаются
+   и структуры decoded_instr_t. */
+void vm_tables_destroy(void) {
+    if (labels) {
+        hash_table_destroy(labels);
+        labels = NULL;
+    }
+    if (breakpoints) {
+        hash_table_destroy(breakpoints);
+        breakpoints = NULL;
+    }
+    if (decoded_cache) {
+        hash_table_destroy(decoded_cache);
+        decoded_cache = NULL;
+    }
+    /* Если у вас есть другие таблицы (symbols, string_pool, etc.)
+       — тоже вызывать hash_table_destroy для них здесь. */
+}
+
+
+void vm_tables_init(void) {
+    labels = hash_table_create(&string_key_type, &uint32_value_type); // name -> addr
+    breakpoints = hash_table_create(&uint32_key_type, &uint32_value_type); // addr -> flag
+    /* Для кеша — сделаем value_type, который освобождает память при del */
+    decoded_cache = hash_table_create(&uint32_key_type, &ptr_value_type);
+
+}
+
+void labels_add(const char *name, uint32_t addr) {
+    hash_table_insert(labels, name, &addr); // копируется внутрь таблицы
+}
+
+uint32_t *labels_lookup(const char *name) {
+    return (uint32_t *)hash_table_lookup(labels, name); // NULL если нет
+}
+
+void bp_set(uint32_t addr) {
+    uint32_t v = 1;
+    hash_table_insert(breakpoints, &addr, &v);
+}
+void bp_clear(uint32_t addr) {
+    hash_table_delete(breakpoints, &addr);
+}
+bool bp_is_set(uint32_t addr) {
+    return hash_table_contains(breakpoints, &addr);
+}
 
 /* ----------------------------
    Стек для PC
@@ -210,6 +313,17 @@ void run_program(void) {
                 break;
             }
             
+            /* Получаем/декодируем инструкцию через кеш */
+            decoded_instr_t *d = decode_instruction(PC);
+            if (!d) {
+                printf("Cycle %u: Failed to decode instruction at PC=0x%X\n", cycle_count, PC);
+                if (logging_enabled && log_file) {
+                    fprintf(log_file, "ERROR: Failed to decode instruction at PC=0x%X\n", PC);
+                }
+                running = false;
+                break;
+            }
+
             uint8_t opcode = OPC(instr);
             
             // Проверка валидности опкода
@@ -227,8 +341,8 @@ void run_program(void) {
             // Логируем ДО выполнения
             log_before(PC, instr);
             
-            // Выполняем инструкцию
-            op_ex[opcode](instr);
+            /* Выполняем инструкцию — вызываем обработчик с raw_instr */
+            op_ex[opcode](d->raw_instr);
             
             // Если PC не изменился, переходим к следующей инструкции
             if (PC == old_pc) {
@@ -248,18 +362,28 @@ void run_program(void) {
         // Вычисляем хеш состояния регистров после выполнения цикла
         uint32_t end_hash = calculate_registers_hash(reg, REG_COUNT);
 
+        if (vm_config.enable_hash_check) {
+            if (cycle_count > 1 && end_hash != prev_cycle_hash) {
+                fprintf(log_file, "!!! HASH MISMATCH: Previous end hash was 0x%08X, current end hash 0x%08X\n",
+                        prev_cycle_hash, end_hash);
+                printf("!!! HASH MISMATCH detected on cycle %u\n", cycle_count);
+            }
+
+            /* Проверяем целостность образа в памяти */
+            uint32_t cur_prog_hash = calculate_memory_hash(mem, PC_START, program_size);
+            if (cur_prog_hash != program_hash) {
+                fprintf(log_file, "!!! PROGRAM MEMORY HASH MISMATCH: expected 0x%08X got 0x%08X\n",
+                        program_hash, cur_prog_hash);
+                printf("!!! PROGRAM MEMORY HASH MISMATCH on cycle %u\n", cycle_count);
+            }
+        }
+        prev_cycle_hash = end_hash;
+
         if (logging_enabled && log_file) {
             fprintf(log_file, "Registers hash at end:   0x%08X\n", end_hash);
         }
 
-        // Проверка на изменение состояния между циклами
-        if (vm_config.enable_hash_check && cycle_count > 1 && end_hash != prev_cycle_hash) {
-            fprintf(log_file, "!!! HASH MISMATCH: Previous end hash was 0x%08X, current end hash 0x%08X\n", prev_cycle_hash, end_hash);
-            printf("!!! HASH MISMATCH detected on cycle %u\n", cycle_count);
-            // Возможные действия: set running=false; trigger fault; for demo — просто логируем.
-        }
-        
-        prev_cycle_hash = end_hash;
+
         
         // Измерение времени выполнения цикла
         clock_gettime(CLOCK_MONOTONIC, &cycle_end);
@@ -301,10 +425,6 @@ void run_program(void) {
                 fprintf(log_file, "WARNING: Maximum instruction limit reached\n");
             }
         }
-
-        if (verify_data_integrity(reg, sizeof(reg), end_hash)) {
-            printf("Registers integrity OK\n");
-    }
     }
     
     close_logging();
@@ -328,7 +448,11 @@ void load_program(const char *fname) {
     
     size_t bytes_read = fread(mem + PC_START, 1, MEM_BYTES - PC_START, fp);
     printf("Loaded %zu bytes into memory at 0x%X\n", bytes_read, PC_START);
-    
+    program_size = bytes_read;
+    program_hash = calculate_memory_hash(mem, PC_START, program_size);
+    printf("Loaded %zu bytes into memory at 0x%X\n", bytes_read, PC_START);
+    printf("Program hash (CRC32): 0x%08X\n", program_hash);
+
     // Выводим первые несколько инструкций
     printf("First instructions:\n");
     for (size_t i = 0; i < 3 && (i * 4) < bytes_read; i++) {
@@ -367,9 +491,14 @@ int main(int argc, char **argv) {
 
     timers_init();
 
+    /* Инициализация таблиц хеширования/кеша */
+    vm_tables_init();
+
     load_program(argv[1]);
     run_program();
     
+    /* Очистка таблиц и ресурсов */
+    vm_tables_destroy();
     free(mem);
     return vm_exit_code;
 }

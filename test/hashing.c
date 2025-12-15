@@ -1,8 +1,4 @@
-#define _POSIX_C_SOURCE 200809L  // можно и без этого, если не требуется
-#include <string.h>
-#include <stdlib.h>
-
-
+#define _POSIX_C_SOURCE 200809L  
 #include "vm32.h"
 #include "hashing.h"
 
@@ -15,7 +11,7 @@
 #include <assert.h>
 
 /* ----------------------------
-   Конфигурация (из Главы 4)
+   Конфигурация 
    ---------------------------- */
 
 #define MIN_TABLE_SIZE 8         // Минимальный размер
@@ -25,19 +21,6 @@
 /* ----------------------------
    Утилиты хеширования
    ---------------------------- */
-
-/* Вычисляет хеш блока данных (FNV-1a алгоритм) */
-uint32_t simple_hash(const void* data, size_t length) {
-    const uint8_t* bytes = (const uint8_t*)data;
-    uint32_t hash = 0x811C9DC5;  // Начальное значение FNV-1a
-    
-    for (size_t i = 0; i < length; i++) {
-        hash ^= bytes[i];
-        hash *= 0x01000193;
-    }
-    
-    return hash;
-}
 
 /* ----------------------------
    CRC32 Implementation (IEEE 802.3)
@@ -172,10 +155,7 @@ static hash_bin_t *find_key(
 }
 
 /* Найти первый пустой bin в пробировании */
-static hash_bin_t *find_empty(
-    hash_table_t *table,
-    uint32_t hash_key
-) {
+static hash_bin_t *find_empty(hash_table_t *table, uint32_t hash_key) {
     for (uint32_t i = 0; i < table->size; i++) {
         hash_bin_t *bin = &table->bins[probe(hash_key, i, table->size)];
         
@@ -509,3 +489,4 @@ bool verify_data_integrity(
 ) {
     return crc32(data, length) == expected_crc;
 }
+

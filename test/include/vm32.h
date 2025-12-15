@@ -100,4 +100,12 @@ static inline void mw32(uint32_t addr, uint32_t val) {
 #define MEM_BYTES (VM_MEM_BYTES)
 #define MEM_WORDS (VM_MEM_WORDS)
 
+typedef struct {
+    uint32_t raw_instr;      // исходное 32-битное слово инструкции
+    uint8_t opcode;
+    uint8_t ra, rb, rc;
+    uint32_t immediate;
+    bool has_immediate;
+} decoded_instr_t;
+
 #endif /* VM32_H */
