@@ -173,12 +173,5 @@ bool verify_data_integrity(const void *data,
                            uint32_t expected_crc);
 
 
-typedef struct {
-    uint32_t raw_instr;      // исходное 32-битное слово инструкции
-    uint8_t opcode;
-    uint8_t ra, rb, rc;
-    uint32_t immediate;
-    bool has_immediate;
-} decoded_instr_t;
 
 #endif /* HASHING_H */

@@ -120,7 +120,7 @@ static inline bool is_active_bin(const hash_bin_t *bin) {
     return bin->in_probe && !bin->is_empty;
 }
 
-/* Трёхуровневая проверка ключа (оптимизация из книги!) */
+/* Трёхуровневая проверка ключа */
 static inline bool key_in_bin(
     const hash_table_t *table,
     const hash_bin_t *bin,
@@ -191,7 +191,7 @@ static inline void store_in_bin(
     void *key,
     void *val
 ) {
-    /* Обновление счётчиков (хитрость с !! из книги) */
+    /* Обновление счётчиков*/
     table->active += !!bin->is_empty;
     table->used += !bin->in_probe;
     
