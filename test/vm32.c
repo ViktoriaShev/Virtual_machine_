@@ -8,6 +8,7 @@
 #include "timers.h"
 
 #include <stdio.h>
+#include <unistd.h>   // usleep
 #include <stdbool.h>
 #include <time.h>
 #include <string.h>
@@ -259,11 +260,6 @@ void run_program(void) {
         pc_stack_ptr = 0;
 
         if (atomic_load(&vm_stop_requested)) {
-
-            /* If exit() already set exit_code — leave it */
-            if (vm_exit_code == 0) {
-                vm_exit_code = 0; // normal shutdown
-            }
 
             run_cleanups();
             break;

@@ -190,7 +190,6 @@ void op_second(uint32_t i) { SetA_val(i, tm_to_tod(current_tm()).seconds); }
 
 /* ===== Строковые функции (безопасно, байтовая память) ===== */
 
-
 // запись нуль-терминированной строки из C в память VM
 // адрес dest берётся из регистра A, длина строки = B, источник строки из reg[C]
 void op_write_string(uint32_t instr) {
@@ -221,7 +220,6 @@ void op_write_const(uint32_t instr, const char *s) {
     memcpy(mem + destAddr, s, len);
     mem[destAddr + len] = '\0';
 }
-
 
 /* Возвращает длину строки по адресу в регистре B */
 void op_len(uint32_t i) {
@@ -519,8 +517,8 @@ void op_exit(uint32_t i) {
         code = (int)A(i);
     }
 
+
     vm_exit_code = code;
-    run_cleanups();
     running = false;
     atomic_store(&vm_stop_requested, true);
 }

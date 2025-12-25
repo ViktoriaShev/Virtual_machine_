@@ -27,9 +27,12 @@ void vm_register_cleanup(cleanup_fn fn, void *ctx) {
 
 void run_cleanups(void) {
     Cleanup *c = cleanup_list;
+    cleanup_list = NULL; // prevent re-entrant use: сбросим голову сразу
     while (c) {
-        c->fn(c->ctx);
-        c = c->next;
+        Cleanup *next = c->next;
+        if (c->fn) c->fn(c->ctx);
+        free(c);
+        c = next;
     }
 }
 
