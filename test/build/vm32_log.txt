@@ -1,15 +1,36 @@
-File size: 264 bytes
-Loaded 264 bytes into memory at 0x3000
-Loaded 264 bytes into memory at 0x3000
-Program hash (CRC32): 0xAA78F2E1
-First instructions:
-  [0x3000] 0x06040000 - DIV
-  [0x3004] 0x02060402 - SUB
-  [0x3008] 0x02080402 - SUB
+Loaded 8 bytes from build/bin/control.bin into memory at 0x3000
+Loaded 12 bytes from build/bin/io.bin into memory at 0x3008
+Loaded 12 bytes from build/bin/main.bin into memory at 0x3014
+
+=== Module Map ===
+Module 0: build/bin/control.bin
+  Address: 0x00003000
+  Size:    8 bytes
+Module 1: build/bin/io.bin
+  Address: 0x00003008
+  Size:    12 bytes
+Module 2: build/bin/main.bin
+  Address: 0x00003014
+  Size:    12 bytes
+==================
+
+Combined program size: 32 bytes
+Combined program hash (CRC32): 0xFCCD4914
+Module 0: build/bin/control.bin at 0x3000 (8 bytes)
+  [build/bin/control.bin + 0x0000] 0x02060600 - SUB
+  [build/bin/control.bin + 0x0004] 0x76000000 - HALT
+Module 1: build/bin/io.bin at 0x3008 (12 bytes)
+  [build/bin/io.bin + 0x0000] 0x00040400 - ADD
+  [build/bin/io.bin + 0x0004] 0x04040400 - MUL
+  [build/bin/io.bin + 0x0008] 0x76000000 - HALT
+Module 2: build/bin/main.bin at 0x3014 (12 bytes)
+  [build/bin/main.bin + 0x0000] 0x00000000 - ADD
+  [build/bin/main.bin + 0x0004] 0x00020200 - ADD
+  [build/bin/main.bin + 0x0008] 0x76000000 - HALT
 Starting VM execution with cycle-based execution
 Cycle time: 1000 ms
 Hash check: enabled
 Cycle overrun check: enabled
 Tick timing: disabled
 
-Cycle 1: 66 instructions, 0 ms elapsed
+Cycle 1: 5 instructions, 0 ms elapsed

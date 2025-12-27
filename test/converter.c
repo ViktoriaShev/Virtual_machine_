@@ -1,14 +1,4 @@
-// Простой ассемблер для VM: текст -> binary (32-bit words)
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <strings.h>
-#include <ctype.h>
-
-#define MAX_LINE 512
-
+// Простой ассемблер для VM: текст -> binary (32-bit words
 // asm2bin.c
 // Ассемблер -> бинарник для VM32 (обновлённая версия с явными immediate '#')
 // Использование: asm2bin input.asm output.bin [--raw-halt]

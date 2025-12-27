@@ -1,5 +1,6 @@
-#define _POSIX_C_SOURCE 200809L  // можно и без этого, если не требуется
+#define _POSIX_C_SOURCE 200809L
 
+#include <unistd.h>   // usleep
 #include "vm32.h"
 #include "funcs.h"
 #include "debug.h"
@@ -8,7 +9,6 @@
 #include "timers.h"
 
 #include <stdio.h>
-#include <unistd.h>   // usleep
 #include <stdbool.h>
 #include <time.h>
 #include <string.h>
@@ -53,6 +53,8 @@ static hash_table_t *labels = NULL;
 static hash_table_t *breakpoints = NULL;
 static hash_table_t *decoded_cache = NULL;
 
+module_info_t *modules = NULL;
+size_t module_count = 0;
 /* ----------------------------
    Таблица инструкций
    ---------------------------- */
@@ -229,6 +231,14 @@ void wait_for_tick(void) {
     clock_gettime(CLOCK_MONOTONIC, &last_tick_time);
 }
 
+/*bool module_needs_reload(module_info_t *m, const char *filepath) {
+    struct stat st;
+    if (stat(filepath, &st) != 0) return false;
+    
+    // Сравниваем mtime или размер
+    return st.st_size != m->size;
+}*/
+
 /* ----------------------------
    Основной цикл выполнения
    ---------------------------- */
@@ -254,13 +264,7 @@ void run_program(void) {
         cycle_count++;
         clock_gettime(CLOCK_MONOTONIC, &cycle_start);
         
-        // Сброс состояния для нового цикла
-        running = true;
-        PC = PC_START;
-        pc_stack_ptr = 0;
-
         if (atomic_load(&vm_stop_requested)) {
-
             run_cleanups();
             break;
         }
@@ -276,7 +280,6 @@ void run_program(void) {
             fprintf(log_file, "Registers hash at start: 0x%08X\n", start_hash);
         }
 
-        // если это первый цикл — и включена проверка, и prev_cycle_hash==0 — инициализируем prev_cycle_hash
         if (vm_config.enable_hash_check && cycle_count == 1) {
             prev_cycle_hash = start_hash;
             if (logging_enabled && log_file) {
@@ -284,217 +287,304 @@ void run_program(void) {
             }
         }
         
-        /* Выполнение программы до завершения или остановки */
-        uint64_t instr_count = 0;
+        /* Выполняем КАЖДЫЙ модуль в этом цикле */
+        uint64_t total_instr_count = 0;
         
-        while (running && instr_count < MAX_INSTRUCTIONS) {
-            // Проверка границ памяти
-            if (PC >= MEM_BYTES - 3) {
-                printf("Cycle %u: PC out of memory bounds (0x%X)\n", cycle_count, PC);
-                if (logging_enabled && log_file) {
-                    fprintf(log_file, "ERROR: PC out of bounds (0x%X)\n", PC);
-                }
-                running = false;
-                break;
+        for (size_t mod_idx = 0; mod_idx < module_count; ++mod_idx) {
+            module_info_t *mod = &modules[mod_idx];
+            
+            if (logging_enabled && log_file) {
+                fprintf(log_file, "\n--- Executing module: %s (0x%X) ---\n", mod->name, mod->addr);
             }
             
-            uint32_t instr = mr32(PC);
+            // Сброс состояния для модуля
+            running = true;
+            PC = mod->addr;
+            pc_stack_ptr = 0;
             
-            // Проверка на пустую память (конец программы)
-            if (instr == 0 && PC > PC_START) {
-                if (logging_enabled && log_file) {
-                    fprintf(log_file, "INFO: End of program reached at PC=0x%X\n", PC);
-                }
-                running = false;
-                break;
-            }
+            uint64_t instr_count = 0;
+            uint32_t module_end = mod->addr + mod->size;
             
-            /* Получаем/декодируем инструкцию через кеш */
-            decoded_instr_t *d = decode_instruction(PC);
-            if (!d) {
-                printf("Cycle %u: Failed to decode instruction at PC=0x%X\n", cycle_count, PC);
-                if (logging_enabled && log_file) {
-                    fprintf(log_file, "ERROR: Failed to decode instruction at PC=0x%X\n", PC);
+            while (running && instr_count < MAX_INSTRUCTIONS) {
+                // Проверка границ модуля
+                if (PC >= module_end || PC < mod->addr) {
+                    if (logging_enabled && log_file) {
+                        fprintf(log_file, "INFO: Module %s completed (PC=0x%X)\n", mod->name, PC);
+                    }
+                    break;
                 }
-                running = false;
-                break;
-            }
+                
+                uint32_t instr = mr32(PC);
+                
+                // Проверка на пустую память
+                if (instr == 0) {
+                    if (logging_enabled && log_file) {
+                        fprintf(log_file, "INFO: End of module %s at PC=0x%X\n", mod->name, PC);
+                    }
+                    break;
+                }
+                
+                decoded_instr_t *d = decode_instruction(PC);
+                if (!d) {
+                    printf("Cycle %u, Module %s: Failed to decode at PC=0x%X\n", 
+                        cycle_count, mod->name, PC);
+                    running = false;
+                    break;
+                }
 
-            uint8_t opcode = OPC(instr);
-            
-            // Проверка валидности опкода
-            if (opcode >= OPCODE_COUNT || op_ex[opcode] == NULL) {
-                printf("Cycle %u: Invalid opcode %u at PC=0x%X\n", cycle_count, opcode, PC);
-                if (logging_enabled && log_file) {
-                    fprintf(log_file, "ERROR: Invalid opcode %u at PC=0x%X\n", opcode, PC);
+                uint8_t opcode = OPC(instr);
+                
+                if (opcode >= OPCODE_COUNT || op_ex[opcode] == NULL) {
+                    printf("Cycle %u, Module %s: Invalid opcode %u at PC=0x%X\n", 
+                        cycle_count, mod->name, opcode, PC);
+                    running = false;
+                    break;
                 }
-                running = false;
-                break;
+                
+                uint32_t old_pc = PC;
+                
+                log_before(PC, instr);
+                op_ex[opcode](d->raw_instr);
+                
+                if (PC == old_pc) {
+                    PC += 4;
+                }
+                
+                log_after(PC);
+                
+                instr_count++;
+                wait_for_tick();
+                update_all_timers();
             }
             
-            uint32_t old_pc = PC;
+            total_instr_count += instr_count;
             
-            // Логируем ДО выполнения
-            log_before(PC, instr);
-            
-            /* Выполняем инструкцию — вызываем обработчик с raw_instr */
-            op_ex[opcode](d->raw_instr);
-            
-            // Если PC не изменился, переходим к следующей инструкции
-            if (PC == old_pc) {
-                PC += 4;
+            if (logging_enabled && log_file) {
+                fprintf(log_file, "Module %s: executed %lu instructions\n", 
+                        mod->name, (unsigned long)instr_count);
             }
-            
-            // Логируем ПОСЛЕ выполнения
-            log_after(PC);
-            
-            instr_count++;
-            
-            // Ожидание такта (если включено)
-            wait_for_tick();
-            update_all_timers();
         }
         
-        // Вычисляем хеш состояния регистров после выполнения цикла
+        // Остальная часть (hash check, timing) остается как есть...
         uint32_t end_hash = calculate_registers_hash(reg, REG_COUNT);
 
         if (vm_config.enable_hash_check) {
             if (cycle_count > 1 && end_hash != prev_cycle_hash) {
-                fprintf(log_file, "!!! HASH MISMATCH: Previous end hash was 0x%08X, current end hash 0x%08X\n",
+                fprintf(log_file, "!!! HASH MISMATCH: Previous 0x%08X, current 0x%08X\n",
                         prev_cycle_hash, end_hash);
                 printf("!!! HASH MISMATCH detected on cycle %u\n", cycle_count);
             }
 
-            /* Проверяем целостность образа в памяти */
             uint32_t cur_prog_hash = calculate_memory_hash(mem, PC_START, program_size);
             if (cur_prog_hash != program_hash) {
-                fprintf(log_file, "!!! PROGRAM MEMORY HASH MISMATCH: expected 0x%08X got 0x%08X\n",
-                        program_hash, cur_prog_hash);
+                fprintf(log_file, "!!! PROGRAM MEMORY HASH MISMATCH\n");
                 printf("!!! PROGRAM MEMORY HASH MISMATCH on cycle %u\n", cycle_count);
             }
         }
         prev_cycle_hash = end_hash;
 
         if (logging_enabled && log_file) {
-            fprintf(log_file, "Registers hash at end:   0x%08X\n", end_hash);
+            fprintf(log_file, "Registers hash at end: 0x%08X\n", end_hash);
         }
-
-
         
-        // Измерение времени выполнения цикла
         clock_gettime(CLOCK_MONOTONIC, &cycle_end);
         long elapsed_ms = get_elapsed_ms(cycle_start, cycle_end);
         long remaining_ms = vm_config.cycle_time_ms - elapsed_ms;
         
         if (logging_enabled && log_file) {
-            fprintf(log_file, "=== CYCLE %u END: executed %lu instructions in %ld ms ===\n",
-                    cycle_count, (unsigned long)instr_count, elapsed_ms);
+            fprintf(log_file, "=== CYCLE %u END: %lu instructions in %ld ms ===\n",
+                    cycle_count, (unsigned long)total_instr_count, elapsed_ms);
         }
         
         printf("Cycle %u: %lu instructions, %ld ms elapsed\n", 
-               cycle_count, (unsigned long)instr_count, elapsed_ms);
+            cycle_count, (unsigned long)total_instr_count, elapsed_ms);
         
-        // Если цикл выполнился быстрее заданного времени - ждем
         if (remaining_ms > 0) {
-            if (logging_enabled && log_file) {
-                fprintf(log_file, "  Waiting for %ld ms to complete cycle\n", remaining_ms);
-            }
             usleep(remaining_ms * 1000);
         } else if (vm_config.enable_cycle_check) {
             printf("!!! WARNING: Cycle %u overrun by %ld ms\n", cycle_count, -remaining_ms);
-            if (logging_enabled && log_file) {
-                fprintf(log_file, "!!! WARNING: Cycle overrun by %ld ms\n", -remaining_ms);
-            }
-        }
-        
-        // Логирование общего времени цикла
-        if (logging_enabled && log_file) {
-            clock_gettime(CLOCK_MONOTONIC, &cycle_end);
-            long total_cycle_ms = get_elapsed_ms(cycle_start, cycle_end);
-            fprintf(log_file, "  Total cycle time: %ld ms\n", total_cycle_ms);
-        }
-        
-        // Проверка на достижение лимита инструкций
-        if (instr_count >= MAX_INSTRUCTIONS) {
-            printf("WARNING: Instruction limit reached in cycle %u\n", cycle_count);
-            if (logging_enabled && log_file) {
-                fprintf(log_file, "WARNING: Maximum instruction limit reached\n");
-            }
         }
     }
     
     close_logging();
 }
 
-/* ----------------------------
-   Загрузка бинарника в память
-   ---------------------------- */
-void load_program(const char *fname) {
-    FILE *fp = fopen(fname, "rb");
-    if (!fp) {
-        fprintf(stderr, "Failed to open program file %s\n", fname);
+void load_programs(const char **fnames, int count) {
+    if (count <= 0) {
+        fprintf(stderr, "No program files specified\n");
         exit(1);
     }
-    
-    // Узнаем размер файла
-    fseek(fp, 0, SEEK_END);
-    long fsize = ftell(fp);
-    printf("File size: %ld bytes\n", fsize);
-    fseek(fp, 0, SEEK_SET);
-    
-    size_t bytes_read = fread(mem + PC_START, 1, MEM_BYTES - PC_START, fp);
-    printf("Loaded %zu bytes into memory at 0x%X\n", bytes_read, PC_START);
-    program_size = bytes_read;
-    program_hash = calculate_memory_hash(mem, PC_START, program_size);
-    printf("Loaded %zu bytes into memory at 0x%X\n", bytes_read, PC_START);
-    printf("Program hash (CRC32): 0x%08X\n", program_hash);
 
-    // Выводим первые несколько инструкций
-    printf("First instructions:\n");
-    for (size_t i = 0; i < 3 && (i * 4) < bytes_read; i++) {
-        uint32_t instr = mr32(PC_START + i * 4);
-        printf("  [0x%04X] 0x%08X - %s\n",
-               (unsigned int)(PC_START + i * 4), instr, opcode_name(OPC(instr)));
+    // (Re)allocate module table
+    modules = (module_info_t *)calloc((size_t)count, sizeof(module_info_t));
+    if (!modules) {
+        fprintf(stderr, "Failed to allocate modules table\n");
+        exit(1);
     }
+
+    uint32_t write_ptr = PC_START;
+    program_size = 0;
+    program_hash = 0;
+
+    for (int i = 0; i < count; ++i) {
+        const char *fname = fnames[i];
+        FILE *fp = fopen(fname, "rb");
+        if (!fp) {
+            fprintf(stderr, "Failed to open program file %s\n", fname);
+            exit(1);
+        }
+
+        // file size
+        fseek(fp, 0, SEEK_END);
+        long fsize = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+
+        if (fsize <= 0) {
+            fprintf(stderr, "Warning: file %s is empty (size=%ld)\n", fname, fsize);
+            fclose(fp);
+            // still record a zero-size module (optional)
+            modules[module_count].name = strdup(fname);
+            modules[module_count].addr = write_ptr;
+            modules[module_count].size = 0;
+            module_count++;
+            continue;
+        }
+
+        // Check memory bounds
+        if ((uint64_t)write_ptr + (uint64_t)fsize > MEM_BYTES) {
+            fprintf(stderr, "Error: loading %s would overflow VM memory (need %ld bytes, available %llu)\n",
+                    fname, fsize, (unsigned long long)(MEM_BYTES - write_ptr));
+            fclose(fp);
+            exit(1);
+        }
+
+        size_t bytes_read = fread(mem + write_ptr, 1, (size_t)fsize, fp);
+        if (bytes_read != (size_t)fsize) {
+            fprintf(stderr, "Error reading file %s: read %zu of %ld\n", fname, bytes_read, fsize);
+            fclose(fp);
+            exit(1);
+        }
+
+        // record module
+        modules[module_count].name = strdup(fname);
+        modules[module_count].addr = write_ptr;
+        modules[module_count].size = (uint32_t)bytes_read;
+        module_count++;
+
+        printf("Loaded %zu bytes from %s into memory at 0x%X\n", bytes_read, fname, write_ptr);
+
+        write_ptr += (uint32_t)bytes_read;
+        program_size += (uint32_t)bytes_read;
+
+        fclose(fp);
+    }
+
+    if (module_count == 0) {
+        fprintf(stderr, "ERROR: No modules were loaded successfully\n");
+        exit(1);
+    }
+
+    printf("\n=== Module Map ===\n");
+    for (size_t i = 0; i < module_count; ++i) {
+        printf("Module %zu: %s\n", i, modules[i].name);
+        printf("  Address: 0x%08X\n", modules[i].addr);
+        printf("  Size:    %u bytes\n", modules[i].size);
+    }
+    printf("==================\n\n");
     
-    fclose(fp);
+    // compute hash for whole program image
+    program_hash = calculate_memory_hash(mem, PC_START, program_size);
+    printf("Combined program size: %zu bytes\n", (size_t)program_size);
+    printf("Combined program hash (CRC32): 0x%08X\n", program_hash);
+
+    // Print first instructions per module (up to 3 each)
+    for (size_t mi = 0; mi < module_count; ++mi) {
+        uint32_t base = modules[mi].addr;
+        uint32_t sz = modules[mi].size;
+        printf("Module %zu: %s at 0x%X (%u bytes)\n", mi, modules[mi].name, base, (unsigned)sz);
+        for (size_t i = 0; i < 3 && (i * 4) < sz; ++i) {
+            uint32_t instr = mr32(base + (uint32_t)(i * 4));
+            printf("  [%s + 0x%04X] 0x%08X - %s\n", modules[mi].name, (unsigned int)(i * 4), instr, opcode_name(OPC(instr)));
+        }
+    }
 }
 
 /* ----------------------------
    Точка входа
    ---------------------------- */
 int main(int argc, char **argv) {
-
     signal(SIGINT, handle_sigterm);
     signal(SIGTERM, handle_sigterm);
-    if (argc != 2) {
-        printf("Usage: %s <program.bin>\n", argv[0]);
+    
+    if (argc < 2) {
+        printf("Usage: %s <program1.bin> [program2.bin ...] [--raw-halt]\n", argv[0]);
         return 1;
     }
     
+    int raw_halt = 0;
+    int file_args_end = argc;
+    
+    // Проверяем последний аргумент на --raw-halt
+    if (argc >= 2 && strcmp(argv[argc-1], "--raw-halt") == 0) {
+        raw_halt = 1;
+        file_args_end = argc - 1;
+    }
+    
+    // Подсчитываем количество файлов
+    int file_count = file_args_end - 1;  // минус argv[0]
+    
+    if (file_count < 1) {
+        fprintf(stderr, "Error: no program files specified\n");
+        return 1;
+    }
+    
+    // Собираем имена файлов
+    const char **filenames = (const char **)malloc(sizeof(char*) * file_count);
+    if (!filenames) {
+        perror("malloc");
+        return 1;
+    }
+    
+    for (int i = 0; i < file_count; ++i) {
+        filenames[i] = argv[1 + i];
+    }
+    
+    // Выделяем память для VM
     mem = (uint8_t*)calloc(1, MEM_BYTES);
     if (!mem) {
         printf("Memory allocation failed\n");
+        free(filenames);
         return 1;
     }
     
+    // Инициализация регистров
     for (int i = 0; i < REG_COUNT; i++) {
         reg[i] = 0;
     }
     
+    // Тестовые значения
     reg[0] = 5;
     reg[1] = 3;
 
     timers_init();
-
-    /* Инициализация таблиц хеширования/кеша */
     vm_tables_init();
 
-    load_program(argv[1]);
+    // Загружаем все программы
+    load_programs(filenames, file_count);
+    
+    // Запускаем VM
     run_program();
     
-    /* Очистка таблиц и ресурсов */
+    // Очистка
     vm_tables_destroy();
     free(mem);
+    free(filenames);
+    
+    // Освобождаем имена модулей
+    for (size_t i = 0; i < module_count; ++i) {
+        free(modules[i].name);
+    }
+    free(modules);
+    
     return vm_exit_code;
 }

@@ -3,8 +3,10 @@ CC      := gcc
 CFLAGS  := -std=c11 -O2 -Wall -Wextra -Iinclude
 LDFLAGS := -lm -latomic
 
-# Директория сборки
+# Директории
 BUILD_DIR := build
+ASM_DIR   := asm
+BIN_DIR   := $(BUILD_DIR)/bin
 
 # -------------------------------
 # Исходники VM32
@@ -21,20 +23,24 @@ CONVERTER_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(CONVERTER_SRCS))
 CONVERTER_TARGET := $(BUILD_DIR)/converter
 
 # -------------------------------
-# Программа
+# ASM → BIN (автоматически все файлы)
 # -------------------------------
-ASM_SRC := program.asm
-BIN_OUT := $(BUILD_DIR)/program.bin
+ASM_SRCS := $(wildcard $(ASM_DIR)/*.asm)
+BIN_FILES := $(patsubst $(ASM_DIR)/%.asm,$(BIN_DIR)/%.bin,$(ASM_SRCS))
+
 VM_LOG  := $(BUILD_DIR)/vm32_log.txt
 
 # -------------------------------
 # Основные цели
 # -------------------------------
-all: $(BUILD_DIR) $(VM_TARGET) $(CONVERTER_TARGET)
+all: $(BUILD_DIR) $(BIN_DIR) $(VM_TARGET) $(CONVERTER_TARGET)
 
-# Создание директории build
+# Создание директорий
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
+
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
 
 # -------------------------------
 # Сборка бинарников
@@ -51,31 +57,40 @@ $(BUILD_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # -------------------------------
-# Конвертация ASM → BIN
+# Конвертация ASM → BIN (правило для каждого файла)
 # -------------------------------
-convert: $(CONVERTER_TARGET)
-	./$(CONVERTER_TARGET) $(ASM_SRC) $(BIN_OUT)
+$(BIN_DIR)/%.bin: $(ASM_DIR)/%.asm $(CONVERTER_TARGET) | $(BIN_DIR)
+	./$(CONVERTER_TARGET) $< $@
+
+# Цель для конвертации всех ASM
+convert: $(BIN_FILES)
+	@echo "✓ Converted $(words $(BIN_FILES)) ASM files to BIN:"
+	@ls -1 $(BIN_DIR)
 
 # -------------------------------
-# Запуск VM
+# Запуск VM (передаем все .bin файлы как аргументы)
 # -------------------------------
-vm: $(VM_TARGET)
-	./$(VM_TARGET) $(BIN_OUT) > $(VM_LOG)
+vm: $(VM_TARGET) convert
+	./$(VM_TARGET) $(BIN_FILES) > $(VM_LOG)
 
 # -------------------------------
 # Полный цикл: build → convert → run
 # -------------------------------
 run: all convert vm
 	@echo "=== VM32 execution finished ==="
-	@echo "Binary: $(BIN_OUT)"
-	@echo "Log:    $(VM_LOG)"
+	@echo "Binaries: $(BIN_DIR)/"
+	@echo "Log:      $(VM_LOG)"
 
 # -------------------------------
 # Debug сборка
 # -------------------------------
 debug: CFLAGS += -g -O0
 debug: clean all
-
+watch:
+	while true; do \
+		inotifywait -e modify $(ASM_DIR)/*.asm; \
+		make convert; \
+	done
 # -------------------------------
 # Очистка
 # -------------------------------

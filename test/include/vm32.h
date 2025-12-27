@@ -108,4 +108,16 @@ typedef struct {
     bool has_immediate;
 } decoded_instr_t;
 
+/* ----------------------------
+   Модульная система
+   ---------------------------- */
+typedef struct {
+    char *name;
+    uint32_t addr;
+    uint32_t size;
+} module_info_t;
+
+extern module_info_t *modules;
+extern size_t module_count;
+
 #endif /* VM32_H */
