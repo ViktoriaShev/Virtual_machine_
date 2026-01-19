@@ -1,100 +1,135 @@
-# Компилятор и флаги
-CC      := gcc
+# =========================================================
+# Toolchains
+# =========================================================
+HOST_CC   := gcc
+ARM64_CC  := aarch64-linux-gnu-gcc
+ARM32_CC  := arm-linux-gnueabihf-gcc
+
+# По умолчанию собираем VM под host
+TARGET ?= host
+
+ifeq ($(TARGET),host)
+VM_CC := $(HOST_CC)
+VM_SUFFIX := host
+endif
+
+ifeq ($(TARGET),arm64)
+VM_CC := $(ARM64_CC)
+VM_SUFFIX := arm64
+endif
+
+ifeq ($(TARGET),arm32)
+VM_CC := $(ARM32_CC)
+VM_SUFFIX := arm32
+endif
+
+# =========================================================
+# Flags
+# =========================================================
 CFLAGS  := -std=c11 -O2 -Wall -Wextra -Iinclude
 LDFLAGS := -lm -latomic
 
-# Директории
+# =========================================================
+# Directories
+# =========================================================
 BUILD_DIR := build
 ASM_DIR   := asm
 BIN_DIR   := $(BUILD_DIR)/bin
 
-# -------------------------------
-# Исходники VM32
-# -------------------------------
+# =========================================================
+# Sources
+# =========================================================
 VM_SRCS := vm32.c funcs.c debug.c hashing.c timers.c cleanup.c
-VM_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(VM_SRCS))
-VM_TARGET := $(BUILD_DIR)/vm32
 
-# -------------------------------
-# Исходники конвертера
-# -------------------------------
-CONVERTER_SRCS := converter.c
-CONVERTER_OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(CONVERTER_SRCS))
+# Host tool (assembler / converter)
+CONVERTER_SRC := converter.c
+
+# =========================================================
+# Targets
+# =========================================================
+VM_TARGET        := $(BUILD_DIR)/vm32_$(VM_SUFFIX)
 CONVERTER_TARGET := $(BUILD_DIR)/converter
 
-# -------------------------------
-# ASM → BIN (автоматически все файлы)
-# -------------------------------
-ASM_SRCS := $(wildcard $(ASM_DIR)/*.asm)
+VM_OBJS := $(patsubst %.c,$(BUILD_DIR)/vm_$(VM_SUFFIX)_%.o,$(VM_SRCS))
+CONVERTER_OBJS := $(BUILD_DIR)/host_converter.o
+
+ASM_SRCS  := $(wildcard $(ASM_DIR)/*.asm)
 BIN_FILES := $(patsubst $(ASM_DIR)/%.asm,$(BIN_DIR)/%.bin,$(ASM_SRCS))
 
-VM_LOG  := $(BUILD_DIR)/vm32_log.txt
+VM_LOG := $(BUILD_DIR)/vm32_$(VM_SUFFIX).log
 
-# -------------------------------
-# Основные цели
-# -------------------------------
-all: $(BUILD_DIR) $(BIN_DIR) $(VM_TARGET) $(CONVERTER_TARGET)
+# =========================================================
+# Default
+# =========================================================
+all: info dirs $(CONVERTER_TARGET) $(VM_TARGET)
 
-# Создание директорий
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
+info:
+	@echo "=== Build configuration ==="
+	@echo "TARGET     = $(TARGET)"
+	@echo "VM_CC      = $(VM_CC)"
+	@echo "VM_BINARY  = $(VM_TARGET)"
+	@echo "==========================="
 
-$(BIN_DIR):
-	mkdir -p $(BIN_DIR)
+dirs:
+	mkdir -p $(BUILD_DIR) $(BIN_DIR)
 
-# -------------------------------
-# Сборка бинарников
-# -------------------------------
-
-$(VM_TARGET): $(VM_OBJS)
-	$(CC) $(CFLAGS) -o $@ $(VM_OBJS) $(LDFLAGS)
-
+# =========================================================
+# Host tool (converter)
+# =========================================================
 $(CONVERTER_TARGET): $(CONVERTER_OBJS)
-	$(CC) $(CFLAGS) -o $@ $(CONVERTER_OBJS)
+	$(HOST_CC) $(CFLAGS) -o $@ $^
 
-# Компиляция .c → .o
-$(BUILD_DIR)/%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILD_DIR)/host_converter.o: $(CONVERTER_SRC)
+	$(HOST_CC) $(CFLAGS) -c $< -o $@
 
-# -------------------------------
-# Конвертация ASM → BIN (правило для каждого файла)
-# -------------------------------
+# =========================================================
+# VM (target)
+# =========================================================
+$(VM_TARGET): $(VM_OBJS)
+	$(VM_CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+$(BUILD_DIR)/vm_$(VM_SUFFIX)_%.o: %.c
+	$(VM_CC) $(CFLAGS) -c $< -o $@
+
+# =========================================================
+# ASM → BIN
+# =========================================================
 $(BIN_DIR)/%.bin: $(ASM_DIR)/%.asm $(CONVERTER_TARGET) | $(BIN_DIR)
 	./$(CONVERTER_TARGET) $< $@
 
-# Цель для конвертации всех ASM
 convert: $(BIN_FILES)
-	@echo "✓ Converted $(words $(BIN_FILES)) ASM files to BIN:"
-	@ls -1 $(BIN_DIR)
+	@echo "✓ Converted $(words $(BIN_FILES)) ASM files to BIN"
 
-# -------------------------------
-# Запуск VM (передаем все .bin файлы как аргументы)
-# -------------------------------
-vm: $(VM_TARGET) convert
+# =========================================================
+# Run (ONLY for host)
+# =========================================================
+run: all convert
+ifeq ($(TARGET),host)
 	./$(VM_TARGET) $(BIN_FILES) > $(VM_LOG)
+	@echo "Log written to $(VM_LOG)"
+else
+	@echo "VM built for $(TARGET). Copy $(VM_TARGET) to target device to run."
+endif
 
-# -------------------------------
-# Полный цикл: build → convert → run
-# -------------------------------
-run: all convert vm
-	@echo "=== VM32 execution finished ==="
-	@echo "Binaries: $(BIN_DIR)/"
-	@echo "Log:      $(VM_LOG)"
-
-# -------------------------------
-# Debug сборка
-# -------------------------------
+# =========================================================
+# Debug
+# =========================================================
 debug: CFLAGS += -g -O0
 debug: clean all
+
+# =========================================================
+# Watch ASM changes
+# =========================================================
 watch:
 	while true; do \
-		inotifywait -e modify $(ASM_DIR)/*.asm; \
+		inotifywait -e modify $(ASM_DIR); \
 		make convert; \
 	done
-# -------------------------------
-# Очистка
-# -------------------------------
+
+# =========================================================
+# Clean
+# =========================================================
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all clean debug convert vm run
+.PHONY: all clean convert run debug watch info dirs
