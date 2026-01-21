@@ -41,7 +41,18 @@ add_library(core
     system/config/ConfigApplier.cpp
     system/lifecycle/LifecycleController.cpp
     system/posix/PosixLog.cpp
+    vm32legacy STATIC
+    legacy/vm32.c
+    legacy/funcs.c
+    legacy/timers.c
+    legacy/hashing.c
+    legacy/debug.c
+    legacy/cleanup.c
+    legacy/converter.c
 )
+
+target_include_directories(vm32legacy PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/legacy/include)
+target_link_libraries(vm32legacy PUBLIC m) 
 
 target_include_directories(core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}

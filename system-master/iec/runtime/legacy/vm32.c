@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <unistd.h>   // usleep
-#include "vm32.h"
+#include "vm32_api.h"
 #include "funcs.h"
 #include "debug.h"
 #include "hashing.h"
@@ -75,6 +75,16 @@ op_ex_f op_ex[OPCODE_COUNT] = {
     op_nop, 
 };
 
+/* Флаг запроса остановки (используется и handle_sigterm) */
+_Atomic bool vm_stop_requested = false;
+
+/* Для интеграции: сохраним локально копии имён файлов, чтобы
+   vm32_shutdown мог их освободить (раньше filenames был локально в main). */
+static char **vm32_filenames = NULL;
+static int vm32_file_count = 0;
+
+/* Флаг инициализации (для безопасности shutdown) */
+static bool vm32_initialized = false;
 /* ----------------------------
    Кеш декодированных инструкций
    ---------------------------- */
@@ -239,176 +249,6 @@ void wait_for_tick(void) {
     return st.st_size != m->size;
 }*/
 
-/* ----------------------------
-   Основной цикл выполнения
-   ---------------------------- */
-void run_program(void) {
-    struct timespec cycle_start, cycle_end;
-    
-    init_timer();
-    init_logging();
-
-     // ⚠️ Устанавливаем CRC32 для production
-    vm_config.hash_algo = HASH_CRC32;
-    vm_config.enable_hash_check = true;
-    
-    printf("Starting VM execution with cycle-based execution\n");
-    printf("Cycle time: %u ms\n", vm_config.cycle_time_ms);
-    printf("Hash check: %s\n", vm_config.enable_hash_check ? "enabled" : "disabled");
-    printf("Cycle overrun check: %s\n", vm_config.enable_cycle_check ? "enabled" : "disabled");
-    printf("Tick timing: %s\n", vm_config.enable_tick_timing ? "enabled" : "disabled");
-    printf("\n");
-    
-    /* Основной цикл выполнения */
-    while (1) {
-        cycle_count++;
-        clock_gettime(CLOCK_MONOTONIC, &cycle_start);
-        
-        if (atomic_load(&vm_stop_requested)) {
-            run_cleanups();
-            break;
-        }
-
-        if (logging_enabled && log_file) {
-            fprintf(log_file, "\n=== CYCLE %u START ===\n", cycle_count);
-        }
-        
-        // Вычисляем хеш состояния регистров перед выполнением цикла
-        uint32_t start_hash = calculate_registers_hash(reg, REG_COUNT);
-
-        if (logging_enabled && log_file) {
-            fprintf(log_file, "Registers hash at start: 0x%08X\n", start_hash);
-        }
-
-        if (vm_config.enable_hash_check && cycle_count == 1) {
-            prev_cycle_hash = start_hash;
-            if (logging_enabled && log_file) {
-                fprintf(log_file, "Initialized prev_cycle_hash = 0x%08X\n", prev_cycle_hash);
-            }
-        }
-        
-        /* Выполняем КАЖДЫЙ модуль в этом цикле */
-        uint64_t total_instr_count = 0;
-        
-        for (size_t mod_idx = 0; mod_idx < module_count; ++mod_idx) {
-            module_info_t *mod = &modules[mod_idx];
-            
-            if (logging_enabled && log_file) {
-                fprintf(log_file, "\n--- Executing module: %s (0x%X) ---\n", mod->name, mod->addr);
-            }
-            
-            // Сброс состояния для модуля
-            running = true;
-            PC = mod->addr;
-            pc_stack_ptr = 0;
-            
-            uint64_t instr_count = 0;
-            uint32_t module_end = mod->addr + mod->size;
-            
-            while (running && instr_count < MAX_INSTRUCTIONS) {
-                // Проверка границ модуля
-                if (PC >= module_end || PC < mod->addr) {
-                    if (logging_enabled && log_file) {
-                        fprintf(log_file, "INFO: Module %s completed (PC=0x%X)\n", mod->name, PC);
-                    }
-                    break;
-                }
-                
-                uint32_t instr = mr32(PC);
-                
-                // Проверка на пустую память
-                if (instr == 0) {
-                    if (logging_enabled && log_file) {
-                        fprintf(log_file, "INFO: End of module %s at PC=0x%X\n", mod->name, PC);
-                    }
-                    break;
-                }
-                
-                decoded_instr_t *d = decode_instruction(PC);
-                if (!d) {
-                    printf("Cycle %u, Module %s: Failed to decode at PC=0x%X\n", 
-                        cycle_count, mod->name, PC);
-                    running = false;
-                    break;
-                }
-
-                uint8_t opcode = OPC(instr);
-                
-                if (opcode >= OPCODE_COUNT || op_ex[opcode] == NULL) {
-                    printf("Cycle %u, Module %s: Invalid opcode %u at PC=0x%X\n", 
-                        cycle_count, mod->name, opcode, PC);
-                    running = false;
-                    break;
-                }
-                
-                uint32_t old_pc = PC;
-                
-                log_before(PC, instr);
-                op_ex[opcode](d->raw_instr);
-                
-                if (PC == old_pc) {
-                    PC += 4;
-                }
-                
-                log_after(PC);
-                
-                instr_count++;
-                wait_for_tick();
-                update_all_timers();
-            }
-            
-            total_instr_count += instr_count;
-            
-            if (logging_enabled && log_file) {
-                fprintf(log_file, "Module %s: executed %lu instructions\n", 
-                        mod->name, (unsigned long)instr_count);
-            }
-        }
-        
-        // Остальная часть (hash check, timing) остается как есть...
-        uint32_t end_hash = calculate_registers_hash(reg, REG_COUNT);
-
-        if (vm_config.enable_hash_check) {
-            if (cycle_count > 1 && end_hash != prev_cycle_hash) {
-                fprintf(log_file, "!!! HASH MISMATCH: Previous 0x%08X, current 0x%08X\n",
-                        prev_cycle_hash, end_hash);
-                printf("!!! HASH MISMATCH detected on cycle %u\n", cycle_count);
-            }
-
-            uint32_t cur_prog_hash = calculate_memory_hash(mem, PC_START, program_size);
-            if (cur_prog_hash != program_hash) {
-                fprintf(log_file, "!!! PROGRAM MEMORY HASH MISMATCH\n");
-                printf("!!! PROGRAM MEMORY HASH MISMATCH on cycle %u\n", cycle_count);
-            }
-        }
-        prev_cycle_hash = end_hash;
-
-        if (logging_enabled && log_file) {
-            fprintf(log_file, "Registers hash at end: 0x%08X\n", end_hash);
-        }
-        
-        clock_gettime(CLOCK_MONOTONIC, &cycle_end);
-        long elapsed_ms = get_elapsed_ms(cycle_start, cycle_end);
-        long remaining_ms = vm_config.cycle_time_ms - elapsed_ms;
-        
-        if (logging_enabled && log_file) {
-            fprintf(log_file, "=== CYCLE %u END: %lu instructions in %ld ms ===\n",
-                    cycle_count, (unsigned long)total_instr_count, elapsed_ms);
-        }
-        
-        printf("Cycle %u: %lu instructions, %ld ms elapsed\n", 
-            cycle_count, (unsigned long)total_instr_count, elapsed_ms);
-        
-        if (remaining_ms > 0) {
-            usleep(remaining_ms * 1000);
-        } else if (vm_config.enable_cycle_check) {
-            printf("!!! WARNING: Cycle %u overrun by %ld ms\n", cycle_count, -remaining_ms);
-        }
-    }
-    
-    close_logging();
-}
-
 void load_programs(const char **fnames, int count) {
     if (count <= 0) {
         fprintf(stderr, "No program files specified\n");
@@ -510,81 +350,338 @@ void load_programs(const char **fnames, int count) {
 }
 
 /* ----------------------------
-   Точка входа
+   Integration API
    ---------------------------- */
-int main(int argc, char **argv) {
-    signal(SIGINT, handle_sigterm);
-    signal(SIGTERM, handle_sigterm);
-    
-    if (argc < 2) {
-        printf("Usage: %s <program1.bin> [program2.bin ...] [--raw-halt]\n", argv[0]);
-        return 1;
+
+/* Инициализация VM для использования как библиотека/движок.
+   cfg может быть NULL — тогда используется глобальный vm_config (дефолт). */
+int vm32_init(const vm_config_t *cfg) {
+    if (vm32_initialized) {
+        return 0; // уже инициализировано
     }
-    
-    int raw_halt = 0;
-    int file_args_end = argc;
-    
-    // Проверяем последний аргумент на --raw-halt
-    if (argc >= 2 && strcmp(argv[argc-1], "--raw-halt") == 0) {
-        raw_halt = 1;
-        file_args_end = argc - 1;
+
+    if (cfg) {
+        vm_config = *cfg; /* копируем конфиг */
     }
-    
-    // Подсчитываем количество файлов
-    int file_count = file_args_end - 1;  // минус argv[0]
-    
-    if (file_count < 1) {
-        fprintf(stderr, "Error: no program files specified\n");
-        return 1;
-    }
-    
-    // Собираем имена файлов
-    const char **filenames = (const char **)malloc(sizeof(char*) * file_count);
-    if (!filenames) {
-        perror("malloc");
-        return 1;
-    }
-    
-    for (int i = 0; i < file_count; ++i) {
-        filenames[i] = argv[1 + i];
-    }
-    
-    // Выделяем память для VM
+
+    /* Сбрасываем request-stop флаг (важно при повторной инициализации) */
+    atomic_store(&vm_stop_requested, false);
+
     mem = (uint8_t*)calloc(1, MEM_BYTES);
     if (!mem) {
-        printf("Memory allocation failed\n");
-        free(filenames);
-        return 1;
+        fprintf(stderr, "vm32_init: memory allocation failed\n");
+        return -1;
     }
-    
-    // Инициализация регистров
-    for (int i = 0; i < REG_COUNT; i++) {
-        reg[i] = 0;
-    }
-    
-    // Тестовые значения
-    reg[0] = 5;
-    reg[1] = 3;
 
+    /* Инициализируем регистры */
+    for (int i = 0; i < REG_COUNT; ++i) reg[i] = 0;
+
+    /* Инициализация подсистем */
     timers_init();
     vm_tables_init();
+    init_logging(); /* опционально: legacy logging backend */
 
-    // Загружаем все программы
-    load_programs(filenames, file_count);
-    
-    // Запускаем VM
-    run_program();
-    
-    // Очистка
-    vm_tables_destroy();
-    free(mem);
-    free(filenames);
-    
-    // Освобождаем имена модулей
-    for (size_t i = 0; i < module_count; ++i) {
-        free(modules[i].name);
+    /* Счётчики / состояние */
+    cycle_count = 0;
+    prev_cycle_hash = 0;
+    program_hash = 0;
+    program_size = 0;
+    module_count = 0;
+
+    /* Очистим предыдущие имена (если вдруг) */
+    if (vm32_filenames) {
+        for (int i = 0; i < vm32_file_count; ++i) free(vm32_filenames[i]);
+        free(vm32_filenames);
+        vm32_filenames = NULL;
+        vm32_file_count = 0;
     }
-    free(modules);
-    
-    return vm_exit_code;
+
+    vm32_initialized = true;
+    return 0;
+}
+
+
+/* Вспомогательная функция: копируем имена файлов внутрь VM */
+static int vm32_store_filenames(const char **fnames, int count) {
+    if (vm32_filenames) {
+        /* если уже были — освободим предыдущие */
+        for (int i = 0; i < vm32_file_count; ++i) free(vm32_filenames[i]);
+        free(vm32_filenames);
+        vm32_filenames = NULL;
+        vm32_file_count = 0;
+    }
+
+    vm32_filenames = (char **)calloc((size_t)count, sizeof(char *));
+    if (!vm32_filenames) return -1;
+
+    for (int i = 0; i < count; ++i) {
+        vm32_filenames[i] = strdup(fnames[i]);
+        if (!vm32_filenames[i]) {
+            // освобождаем ранее выделенные и выходим
+            for (int j = 0; j < i; ++j) free(vm32_filenames[j]);
+            free(vm32_filenames);
+            vm32_filenames = NULL;
+            vm32_file_count = 0;
+            return -1;
+        }
+    }
+    vm32_file_count = count;
+    return 0;
+}
+
+/* Загрузка программ — wrapper над load_programs.
+   Копируем имена, затем вызываем существующую load_programs(). */
+/* Вспомогательная проверка: все файлы доступны */
+static int vm32_verify_files_accessible(const char **fnames, int count) {
+    for (int i = 0; i < count; ++i) {
+        FILE *f = fopen(fnames[i], "rb");
+        if (!f) {
+            return -1;
+        }
+        fclose(f);
+    }
+    return 0;
+}
+
+int vm32_load_programs(const char **fnames, int count) {
+    if (!vm32_initialized) {
+        fprintf(stderr, "vm32_load_programs: VM not initialized\n");
+        return -1;
+    }
+    if (count <= 0) {
+        fprintf(stderr, "vm32_load_programs: no files\n");
+        return -1;
+    }
+
+    /* Проверим доступность файлов — чтобы избежать exit() внутри legacy load_programs */
+    if (vm32_verify_files_accessible(fnames, count) != 0) {
+        fprintf(stderr, "vm32_load_programs: one or more files are not accessible\n");
+        return -1;
+    }
+
+    if (vm32_store_filenames(fnames, count) != 0) {
+        fprintf(stderr, "vm32_load_programs: failed to store filenames\n");
+        return -1;
+    }
+
+    /* Вызов существующей функции загрузки (может exit() при ошибке чтения) */
+    load_programs((const char**)vm32_filenames, vm32_file_count);
+
+    return 0;
+}
+
+
+/* Выполнение ровно одного PLC-цикла.
+   ВАЖНО: не вызывает sleep/usleep и не завершает логирование. */
+static void execute_one_cycle(void) {
+    struct timespec cycle_start, cycle_end;
+
+    /* Инициализируем таймер только при первом вызове цикла */
+    if (cycle_count == 0) {
+        init_timer();
+    }
+
+    cycle_count++;
+    clock_gettime(CLOCK_MONOTONIC, &cycle_start);
+
+    if (atomic_load(&vm_stop_requested)) {
+        /* Если просили остановиться — вызовем cleanup handlers, но оставим
+           полную очистку на vm32_shutdown() */
+        run_cleanups();
+        return;
+    }
+
+    if (logging_enabled && log_file) {
+        fprintf(log_file, "\n=== CYCLE %u START ===\n", cycle_count);
+    }
+
+    uint32_t start_hash = calculate_registers_hash(reg, REG_COUNT);
+    if (logging_enabled && log_file) {
+        fprintf(log_file, "Registers hash at start: 0x%08X\n", start_hash);
+    }
+
+    if (vm_config.enable_hash_check && cycle_count == 1) {
+        prev_cycle_hash = start_hash;
+        if (logging_enabled && log_file) {
+            fprintf(log_file, "Initialized prev_cycle_hash = 0x%08X\n", prev_cycle_hash);
+        }
+    }
+
+    uint64_t total_instr_count = 0;
+
+    for (size_t mod_idx = 0; mod_idx < module_count; ++mod_idx) {
+        module_info_t *mod = &modules[mod_idx];
+
+        if (logging_enabled && log_file) {
+            fprintf(log_file, "\n--- Executing module: %s (0x%X) ---\n", mod->name, mod->addr);
+        }
+
+        running = true;
+        PC = mod->addr;
+        pc_stack_ptr = 0;
+
+        uint64_t instr_count = 0;
+        uint32_t module_end = mod->addr + mod->size;
+
+        while (running && instr_count < MAX_INSTRUCTIONS) {
+            if (PC >= module_end || PC < mod->addr) {
+                if (logging_enabled && log_file) {
+                    fprintf(log_file, "INFO: Module %s completed (PC=0x%X)\n", mod->name, PC);
+                }
+                break;
+            }
+
+            uint32_t instr = mr32(PC);
+
+            if (instr == 0) {
+                if (logging_enabled && log_file) {
+                    fprintf(log_file, "INFO: End of module %s at PC=0x%X\n", mod->name, PC);
+                }
+                break;
+            }
+
+            decoded_instr_t *d = decode_instruction(PC);
+            if (!d) {
+                fprintf(stderr, "Cycle %u, Module %s: Failed to decode at PC=0x%X\n",
+                        cycle_count, mod->name, PC);
+                running = false;
+                break;
+            }
+
+            uint8_t opcode = OPC(d->raw_instr);
+
+            if (opcode >= OPCODE_COUNT || op_ex[opcode] == NULL) {
+                fprintf(stderr, "Cycle %u, Module %s: Invalid opcode %u at PC=0x%X\n",
+                        cycle_count, mod->name, opcode, PC);
+                running = false;
+                break;
+            }
+
+            uint32_t old_pc = PC;
+
+            log_before(PC, d->raw_instr);
+            op_ex[opcode](d->raw_instr);
+
+            if (PC == old_pc) {
+                PC += 4;
+            }
+
+            log_after(PC);
+
+            instr_count++;
+            /* НЕ ВЫЗЫВАЕМ sleep/usleep здесь — внешняя система контролирует timing */
+            wait_for_tick();        /* если включено tick_timing, это оставляем (опционально) */
+            update_all_timers();
+        }
+
+        total_instr_count += instr_count;
+
+        if (logging_enabled && log_file) {
+            fprintf(log_file, "Module %s: executed %lu instructions\n",
+                    mod->name, (unsigned long)instr_count);
+        }
+    }
+
+    uint32_t end_hash = calculate_registers_hash(reg, REG_COUNT);
+
+    if (vm_config.enable_hash_check) {
+        if (cycle_count > 1 && end_hash != prev_cycle_hash) {
+            if (logging_enabled && log_file) {
+                fprintf(log_file, "!!! HASH MISMATCH: Previous 0x%08X, current 0x%08X\n",
+                        prev_cycle_hash, end_hash);
+            }
+            fprintf(stderr, "!!! HASH MISMATCH detected on cycle %u\n", cycle_count);
+        }
+
+        uint32_t cur_prog_hash = calculate_memory_hash(mem, PC_START, program_size);
+        if (cur_prog_hash != program_hash) {
+            if (logging_enabled && log_file) {
+                fprintf(log_file, "!!! PROGRAM MEMORY HASH MISMATCH\n");
+            }
+            fprintf(stderr, "!!! PROGRAM MEMORY HASH MISMATCH on cycle %u\n", cycle_count);
+        }
+    }
+    prev_cycle_hash = end_hash;
+
+    if (logging_enabled && log_file) {
+        fprintf(log_file, "Registers hash at end: 0x%08X\n", end_hash);
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &cycle_end);
+    long elapsed_ms = get_elapsed_ms(cycle_start, cycle_end);
+
+    if (logging_enabled && log_file) {
+        fprintf(log_file, "=== CYCLE %u END: %lu instructions in %ld ms ===\n",
+                cycle_count, (unsigned long)total_instr_count, elapsed_ms);
+    }
+
+    printf("Cycle %u: %lu instructions, %ld ms elapsed\n",
+           cycle_count, (unsigned long)total_instr_count, elapsed_ms);
+
+    /* НЕ ЖДЁМ НИЧЕГО ЗДЕСЬ — внешний scheduler должен контролировать паузы */
+}
+
+/* Публичная функция: обёртка над execute_one_cycle */
+void vm32_execute_cycle(void) {
+    if (!vm32_initialized) {
+        fprintf(stderr, "vm32_execute_cycle: VM not initialized\n");
+        return;
+    }
+    if (atomic_load(&vm_stop_requested)) {
+        /* если уже запрошен стоп — ничего не делаем */
+        return;
+    }
+
+    execute_one_cycle();
+}
+
+
+/* Запрос на остановку */
+void vm32_request_stop(void) {
+    atomic_store(&vm_stop_requested, true);
+}
+
+int vm32_is_running(void) {
+    return vm32_initialized && !atomic_load(&vm_stop_requested);
+}
+void vm32_shutdown(void) {
+    if (!vm32_initialized) return;
+
+    /* попросим остановиться и выполним локальные cleanups (если нужно) */
+    atomic_store(&vm_stop_requested, true);
+
+    /* дёргаем cleanup handlers, если они нужны */
+    run_cleanups();
+
+    /* Очистка модулей/таблиц/памяти */
+    vm_tables_destroy();
+
+    if (mem) {
+        free(mem);
+        mem = NULL;
+    }
+
+    /* Если у нас были скопированы имена файлов — освободим */
+    if (vm32_filenames) {
+        for (int i = 0; i < vm32_file_count; ++i) {
+            free(vm32_filenames[i]);
+        }
+        free(vm32_filenames);
+        vm32_filenames = NULL;
+        vm32_file_count = 0;
+    }
+
+    /* Освобождение modules (как в конце main) */
+    if (modules) {
+        for (size_t i = 0; i < module_count; ++i) {
+            free(modules[i].name);
+        }
+        free(modules);
+        modules = NULL;
+        module_count = 0;
+    }
+
+    close_logging();
+
+    vm32_initialized = false;
 }

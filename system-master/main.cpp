@@ -24,11 +24,16 @@ int main() {
     auto logger   = std::make_shared<LoggerComponent>(bus);
     auto sched    = std::make_shared<SchedulerComponent>(bus);
     auto taskMgr  = std::make_shared<TaskManagerComponent>(bus);
+    auto vmComp = std::make_shared<system_runtime::VM32Component>();
+    vmComp->setBus(&bus);
 
+    // при желании передать программы:
+    vmComp->setProgramFiles({ "build/bin/main.bin", "build/bin/io.bin" });
     cm.addComponent(eventMgr);
     cm.addComponent(logger);
     cm.addComponent(sched);
     cm.addComponent(taskMgr);
+    cm.addComponent(vmComp)
 
     if (!lifecycle.init()) return 1;
     if (!cm.initAll()) return 1;

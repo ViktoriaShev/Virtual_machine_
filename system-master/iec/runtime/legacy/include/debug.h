@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define NUM_REGS REG_COUNT
 #define MEM_LOG_SIZE 256
 
 // Глобальные переменные для логирования
@@ -24,5 +23,8 @@ void close_logging();
 
 // Декодирование опкодов для отладки
 const char* opcode_name(uint8_t opcode);
+
+typedef void (*vm_log_callback_t)(const char *msg);
+void vm_set_log_callback(vm_log_callback_t cb);
 
 #endif

@@ -1,9 +1,11 @@
 #define _POSIX_C_SOURCE 200809L  // можно и без этого, если не требуется
-#include "vm32.h"
+#include "vm32_api.h"
 #include "debug.h"
 #include "funcs.h"
 
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <time.h>
 
 // Глобальные переменные
@@ -33,6 +35,26 @@ static const char* opcode_names[OPCODE_COUNT] = {
     "HALT", "EXIT"
 };
 
+/* callback (по умолчанию NULL) */
+static vm32_log_cb_t vm32_log_cb = NULL;
+
+/* Установка callback из внешнего кода */
+void vm32_set_log_callback(vm32_log_cb_t cb) {
+    vm32_log_cb = cb;
+}
+
+/* Вспомогательная функция: форматированный лог (вызовет callback, если он установлен) */
+static void vm32_call_cb(int level, const char *fmt, ...) {
+    if (!vm32_log_cb) return;
+
+    char buf[4096];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+
+    vm32_log_cb(level, buf);
+}
 
 const char* opcode_name(uint8_t opcode) {
     if (opcode >= OPCODE_COUNT) return "UNKNOWN";
@@ -120,20 +142,20 @@ void fprintf_reg_all(FILE *f, uint32_t *reg, int size) {
 
 void init_logging() {
     if (!logging_enabled) return;
-    
     log_file = fopen("vm32_log.txt", "w");
     if (!log_file) {
         perror("Failed to open log file");
         logging_enabled = false;
         return;
     }
-    
+    if (vm32_log_cb) vm32_call_cb(VM32_LOG_INFO, "VM32 logging initialized");
+
     time_t now = time(NULL);
     fprintf(log_file, "╔═══════════════════════════════════════════════════════════════╗\n");
     fprintf(log_file, "║           VM32 Execution Log - %s", ctime(&now));
     fprintf(log_file, "╠═══════════════════════════════════════════════════════════════╣\n");
     fprintf(log_file, "║ Memory: %llu bytes (%.2f MB)\n", VM_MEM_BYTES, VM_MEM_BYTES / (1024.0 * 1024.0));
-    fprintf(log_file, "║ Registers: %d\n", NUM_REGS);
+    fprintf(log_file, "║ Registers: %d\n", REG_COUNT);
     fprintf(log_file, "║ Start PC: 0x%04X\n", PC_START);
     fprintf(log_file, "╚═══════════════════════════════════════════════════════════════╝\n\n");
     fflush(log_file);
@@ -143,7 +165,8 @@ void init_logging() {
 
 void log_instruction(uint32_t pc, uint32_t instr) {
     if (!logging_enabled || !log_file) return;
-    
+    if (vm32_log_cb) vm32_call_cb(VM32_LOG_DEBUG, "PC=0x%04X instr=0x%08X %s", pc, instr, opcode_name(OPC(instr)));
+
     fprintf(log_file, "┌─ Instruction #%lu ─────────────────────────────────────────\n", 
             ++instruction_count);
     fprintf(log_file, "│ PC: 0x%04X\n", pc);
@@ -196,7 +219,7 @@ void log_after(uint32_t pc) {
     
     // Логируем изменения регистров
     bool reg_changed = false;
-    for (int i = 0; i < NUM_REGS; i++) {
+    for (int i = 0; i < REG_COUNT; i++) {
         if (prev_reg[i] != reg[i]) {
             if (!reg_changed) {
                 fprintf(log_file, "│ Register CHANGES:\n");
@@ -242,7 +265,8 @@ void log_after(uint32_t pc) {
 
 void close_logging() {
     if (!log_file) return;
-    
+    if (vm32_log_cb) vm32_call_cb(VM32_LOG_INFO, "VM32 logging closed. Total instructions: %lu", instruction_count);
+
     fprintf(log_file, "\n╔═══════════════════════════════════════════════════════════════╗\n");
     fprintf(log_file, "║ Execution Summary\n");
     fprintf(log_file, "╠═══════════════════════════════════════════════════════════════╣\n");
@@ -252,8 +276,4 @@ void close_logging() {
     
     fclose(log_file);
     log_file = NULL;
-}
-
-void vm_log(const char* fmt, ...) {
-    system_logger->log(...);
 }
