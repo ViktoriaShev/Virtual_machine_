@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Интеграция в скелет.md",
+                "file": "Полезные материалы.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Интеграция в скелет"
+              "title": "Полезные материалы"
             }
           }
         ]
@@ -171,32 +171,32 @@
   },
   "active": "7629a8cbb868b626",
   "lastOpenFiles": [
+    "Приложение - как считать.md",
     "Описание и характеристики  VM32 для контроллеров (PLC).md",
+    "Сделать.md",
+    "VM_dairy.md",
+    "public/Pasted image 20250722102957.png",
+    "public/Форма команды.drawio.png",
+    "public/Типы команд.drawio.png",
+    "Untitled 1.md",
+    "Тестовые испытания VM.md",
+    "Таблица operational codes.md",
+    "Схема работ.md",
+    "Пособие - как писать на псевдоассемблере.md",
     "Интеграция в скелет.md",
     "Описание Makefile, функции командной строки.md",
     "Введение.md",
-    "Пособие - как писать на псевдоассемблере.md",
     "Вопросы подкачки.md",
     "Дальнейшее развитие виртуальной машины VM32.md",
-    "Приложение - как считать.md",
     "Размышления об архитектуре будущей полной VM.md",
     "Режим immediate.md",
-    "Сделать.md",
-    "Схема работ.md",
     "Полезные материалы.md",
-    "public/Форма команды.drawio.png",
-    "public/Типы команд.drawio.png",
     "Диаграмма без названия.drawio(2).png",
     "Диаграмма вм.png",
-    "Untitled 1.md",
-    "VM_dairy.md",
-    "Тестовые испытания VM.md",
     "Флаги для работы UART в RS485.md",
-    "Таблица operational codes.md",
     "ethernet to UART.md",
     "Приложение - Хеширование в проекте VM32**.md",
     "ethernet to UART 1.md",
-    "public",
-    "public/Pasted image 20250722102957.png"
+    "public"
   ]
 }

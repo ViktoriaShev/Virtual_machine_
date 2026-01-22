@@ -511,7 +511,7 @@ void op_exit(uint32_t i) {
     
     // Если A == 0, код выхода берётся из immediate (C)
     // Если A != 0, код берётся из регистра A
-    if (RA(i) == 0) {
+    if (Av(i) == 0) {
         code = (int)IMM8(i);  // Immediate из поля C
     } else {
         code = (int)A(i);

@@ -67,10 +67,11 @@ typedef struct {
 #define Cv_or_imm(i) (FIMM(i) ? SEXTIMM8(i) : reg[RC(i)])
 
 /* --- Удобные обёртки для operand helpers (A/B/C как в исходнике) --- */
- inline  uint32_t A(uint32_t i) { return RA(i); }       // номер регистра A
- inline  uint32_t Bv(uint32_t i) { return reg[RB(i)]; } // значение B (обычно адрес)
- inline  uint32_t Cv(uint32_t i) { return reg[RC(i)]; } // значение C (число или адрес)
- inline void SetA_val(uint32_t i, uint32_t v) { reg[RA(i)] = v; }
+inline uint32_t Av(uint32_t i) { return reg[RA(i)]; }
+inline  uint32_t A(uint32_t i) { return RA(i); }       // номер регистра A
+inline  uint32_t Bv(uint32_t i) { return reg[RB(i)]; } // значение B (обычно адрес)
+inline  uint32_t Cv(uint32_t i) { return reg[RC(i)]; } // значение C (число или адрес)
+inline void SetA_val(uint32_t i, uint32_t v) { reg[RA(i)] = v; }
 
 /* Функция знакового расширения */
 /* Знаковое расширение */
