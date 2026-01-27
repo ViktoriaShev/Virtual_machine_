@@ -360,32 +360,33 @@ static inline int get_timer_id_from_regA(uint32_t i) {
 }
 
 void op_ton(uint32_t i) {
-    int id = (int)reg[RA(i)];
-    if (id < 0 || id >= MAX_TIMERS) return;
+    int id = get_timer_id_from_regA(i);
+    if (id < 0) return;
     bool in = reg[RB(i)] != 0;
     uint32_t pt = Cv_or_imm(i);
+    /* ton_set гарантированно выставляет enabled=true и обновляет состояние этого таймера */
     ton_set((uint8_t)id, in, pt);
+    /* Вернём Q в регистр A (как требует дока). Уже безопасно: id сохранён в локальной переменной. */
     reg[RA(i)] = ton_Q((uint8_t)id) ? 1 : 0;
 }
 
 void op_tof(uint32_t i) {
-    int id = (int)reg[RA(i)];
-    if (id < 0 || id >= MAX_TIMERS) return;
+    int id = get_timer_id_from_regA(i);
+    if (id < 0) return;
     bool in = reg[RB(i)] != 0;
-     uint32_t pt = Cv_or_imm(i);
+    uint32_t pt = Cv_or_imm(i);
     tof_set((uint8_t)id, in, pt);
     reg[RA(i)] = tof_Q((uint8_t)id) ? 1 : 0;
 }
 
 void op_tp(uint32_t i) {
-    int id = (int)reg[RA(i)];
-    if (id < 0 || id >= MAX_TIMERS) return;
+    int id = get_timer_id_from_regA(i);
+    if (id < 0) return;
     bool in = reg[RB(i)] != 0;
     uint32_t pt = Cv_or_imm(i);
     tp_set((uint8_t)id, in, pt);
     reg[RA(i)] = tp_Q((uint8_t)id) ? 1 : 0;
 }
-
 
 /* ===== Счётчики CTU/CTD/CTUD ===== */
 

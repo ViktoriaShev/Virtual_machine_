@@ -219,7 +219,7 @@ int main(int argc, char** argv) {
         char *tC = strtok(NULL, " \t,");
 
         int Areg = 0, Breg = 0;
-        Operand Cop; Cop.type = OP_REG; Ccop:
+        Operand Cop; Cop.type = OP_REG; //Ccop:
         Cop.value = 0;
 
         // Parse A
@@ -263,19 +263,18 @@ int main(int argc, char** argv) {
                     fprintf(stderr,"Line %lu: Opcode '%s' does not allow immediate in C; use a register.\n", lineno, opent->name);
                     fclose(in); fclose(out); return 1;
                 }
-                if (!check_imm9_range(immv)) {
-                    fprintf(stderr,"Line %lu: Immediate out of range for 9-bit signed (-256..255): %d\n", lineno, immv);
+                /* Мы кодируем immediate как: бит8 = 1 (FIMM flag), биты0..7 = 8-bit signed immediate.
+                   Поэтому допустимый диапазон: -128 .. 127. */
+                if (!(immv >= -128 && immv <= 127)) {
+                    fprintf(stderr,"Line %lu: Immediate out of range for C operand (-128..127): %d\n", lineno, immv);
                     fclose(in); fclose(out); return 1;
                 }
                 Cop.type = OP_IMM; Cop.value = immv;
             } else {
-                fprintf(stderr,"Line %lu: bad operand C '%s' — expected R<n> or #<imm>\n", lineno, tC);
-                fclose(in); fclose(out); return 1;
-            }
-        } else {
             // If no C token, default C = 0
             Cop.type = OP_REG; Cop.value = 0;
         }
+    }
 
         // Check if opcode requires C to be a register
         if ((opent->cflags & CFLAG_C_MUST_REG) && Cop.type == OP_IMM) {
@@ -290,15 +289,15 @@ int main(int argc, char** argv) {
         uint32_t Bfield = (uint32_t)(Breg & 0xFF);
         uint32_t Cfield = 0;
 
-        if (Cop.type == OP_REG) {
-            Cfield = (uint32_t)(Cop.value & 0xFF); // top bit (bit8) = 0
+       if (Cop.type == OP_REG) {
+            /* C as register: bit8 == 0, bits0..7 = reg index */
+            Cfield = (uint32_t)(Cop.value & 0xFF);
         } else {
-            // immediate signed 9-bit -> encode as two's complement in 9 bits
-            int v = Cop.value;
-            uint32_t u = (uint32_t)(v & 0x1FF); // lower 9 bits
-            Cfield = u;
+            /* C as immediate: set bit8 = 1 to mark immediate, bits0..7 = 8-bit two's complement immediate */
+            int v = Cop.value;               /* signed -128..127 */
+            uint32_t low8 = (uint32_t)((uint8_t)v); /* take low 8 bits */
+            Cfield = (1u << 8) | (low8 & 0xFF);     /* bit8==1 => FIMM, low 8 bits immediate */
         }
-
         uint32_t word = ((uint32_t)op << 25) | (Afield << 17) | (Bfield << 9) | Cfield;
 
         uint8_t bytes[4];

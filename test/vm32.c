@@ -37,6 +37,7 @@ uint32_t PC = 0;
 uint8_t *mem = NULL;
 uint32_t reg[REG_COUNT] = {0};
 bool running = true;
+time_ms = 0;
 
 /* Переменные для работы с циклами */
 
@@ -354,7 +355,6 @@ void run_program(void) {
                 
                 instr_count++;
                 wait_for_tick();
-                update_all_timers();
             }
             
             total_instr_count += instr_count;
@@ -364,7 +364,7 @@ void run_program(void) {
                         mod->name, (unsigned long)instr_count);
             }
         }
-        
+        update_all_timers();
         // Остальная часть (hash check, timing) остается как есть...
         uint32_t end_hash = calculate_registers_hash(reg, REG_COUNT);
 

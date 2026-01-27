@@ -1,6 +1,7 @@
 Loaded 8 bytes from build/bin/control.bin into memory at 0x3000
 Loaded 12 bytes from build/bin/io.bin into memory at 0x3008
 Loaded 12 bytes from build/bin/main.bin into memory at 0x3014
+Loaded 196 bytes from build/bin/timer_test.bin into memory at 0x3020
 
 === Module Map ===
 Module 0: build/bin/control.bin
@@ -12,10 +13,13 @@ Module 1: build/bin/io.bin
 Module 2: build/bin/main.bin
   Address: 0x00003014
   Size:    12 bytes
+Module 3: build/bin/timer_test.bin
+  Address: 0x00003020
+  Size:    196 bytes
 ==================
 
-Combined program size: 32 bytes
-Combined program hash (CRC32): 0xFCCD4914
+Combined program size: 228 bytes
+Combined program hash (CRC32): 0xF307887F
 Module 0: build/bin/control.bin at 0x3000 (8 bytes)
   [build/bin/control.bin + 0x0000] 0x02060600 - SUB
   [build/bin/control.bin + 0x0004] 0x76000000 - HALT
@@ -27,10 +31,14 @@ Module 2: build/bin/main.bin at 0x3014 (12 bytes)
   [build/bin/main.bin + 0x0000] 0x00000000 - ADD
   [build/bin/main.bin + 0x0004] 0x00020200 - ADD
   [build/bin/main.bin + 0x0008] 0x76000000 - HALT
+Module 3: build/bin/timer_test.bin at 0x3020 (196 bytes)
+  [build/bin/timer_test.bin + 0x0000] 0x02040000 - SUB
+  [build/bin/timer_test.bin + 0x0004] 0x00140400 - ADD
+  [build/bin/timer_test.bin + 0x0008] 0x00160400 - ADD
 Starting VM execution with cycle-based execution
 Cycle time: 1000 ms
 Hash check: enabled
 Cycle overrun check: enabled
 Tick timing: disabled
 
-Cycle 1: 5 instructions, 0 ms elapsed
+Cycle 1: 54 instructions, 1 ms elapsed
