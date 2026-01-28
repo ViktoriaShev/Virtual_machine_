@@ -40,5 +40,6 @@ Cycle time: 1000 ms
 Hash check: enabled
 Cycle overrun check: enabled
 Tick timing: disabled
+Clock rate: 100 Hz
 
-Cycle 1: 54 instructions, 1 ms elapsed
+Cycle 1: 54 instructions, 0 ms elapsed, time_ms=10934382

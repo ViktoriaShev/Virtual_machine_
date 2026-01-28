@@ -37,8 +37,8 @@ uint32_t PC = 0;
 uint8_t *mem = NULL;
 uint32_t reg[REG_COUNT] = {0};
 bool running = true;
-time_ms = 0;
-
+uint64_t time_ms = 0;
+static uint64_t instr_ns_accum = 0;
 /* Переменные для работы с циклами */
 
 /* Program integrity */
@@ -249,6 +249,10 @@ void run_program(void) {
     init_timer();
     init_logging();
 
+    struct timespec __now;
+    clock_gettime(CLOCK_MONOTONIC, &__now);
+    time_ms = (uint64_t)__now.tv_sec * 1000ULL + (uint64_t)(__now.tv_nsec / 1000000ULL);
+    
      // ⚠️ Устанавливаем CRC32 для production
     vm_config.hash_algo = HASH_CRC32;
     vm_config.enable_hash_check = true;
@@ -258,20 +262,20 @@ void run_program(void) {
     printf("Hash check: %s\n", vm_config.enable_hash_check ? "enabled" : "disabled");
     printf("Cycle overrun check: %s\n", vm_config.enable_cycle_check ? "enabled" : "disabled");
     printf("Tick timing: %s\n", vm_config.enable_tick_timing ? "enabled" : "disabled");
+    printf("Clock rate: %u Hz\n", vm_config.clock_rate_hz);
     printf("\n");
     
     /* Основной цикл выполнения */
     while (1) {
         cycle_count++;
         clock_gettime(CLOCK_MONOTONIC, &cycle_start);
-        
         if (atomic_load(&vm_stop_requested)) {
             run_cleanups();
             break;
         }
-
+        uint64_t cycle_start_ms = time_ms;
         if (logging_enabled && log_file) {
-            fprintf(log_file, "\n=== CYCLE %u START ===\n", cycle_count);
+            fprintf(log_file, "\n=== CYCLE %u START (time_ms=%llu) ===\n", cycle_count, (unsigned long long)time_ms);
         }
         
         // Вычисляем хеш состояния регистров перед выполнением цикла
@@ -355,6 +359,24 @@ void run_program(void) {
                 
                 instr_count++;
                 wait_for_tick();
+
+                if (vm_config.enable_tick_timing && vm_config.clock_rate_hz != 0) {
+                    struct timespec __now;
+                    clock_gettime(CLOCK_MONOTONIC, &__now);
+                    time_ms = (uint64_t)__now.tv_sec * 1000ULL + (uint64_t)(__now.tv_nsec / 1000000ULL);
+                } else if (vm_config.clock_rate_hz != 0) {
+                    /* Более точное симулирование времени на инструкцию:
+                    считаем наносекунды на инструкцию и аккумулируем остаток. */
+                    uint64_t instr_ns = 1000000000ULL / (uint64_t)vm_config.clock_rate_hz;
+                    instr_ns_accum += instr_ns;
+
+                    /* Добавляем целые миллисекунды в time_ms, оставшийся ns держим в аккумуляторе */
+                    uint64_t add_ms = instr_ns_accum / 1000000ULL;
+                    if (add_ms) {
+                        time_ms += add_ms;
+                        instr_ns_accum -= add_ms * 1000000ULL;
+                    }
+                }
             }
             
             total_instr_count += instr_count;
@@ -364,7 +386,23 @@ void run_program(void) {
                         mod->name, (unsigned long)instr_count);
             }
         }
+        
+        /* === КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ ===
+         * Финализация времени в конце цикла:
+         * В детерминированном режиме time_ms УЖЕ обновлён через instr_ns_accum
+         * в цикле выполнения. Нужно только гарантировать минимум cycle_time_ms.
+         */
+        if (!vm_config.enable_tick_timing) {
+            /* Гарантируем что цикл занял минимум cycle_time_ms */
+            uint64_t expected_end = cycle_start_ms + (uint64_t)vm_config.cycle_time_ms;
+            if (time_ms < expected_end) {
+                time_ms = expected_end;
+            }
+        }
+
+        /* Теперь обновляем все IEC-таймеры — они смотрят на time_ms */
         update_all_timers();
+        
         // Остальная часть (hash check, timing) остается как есть...
         uint32_t end_hash = calculate_registers_hash(reg, REG_COUNT);
 
@@ -385,6 +423,9 @@ void run_program(void) {
 
         if (logging_enabled && log_file) {
             fprintf(log_file, "Registers hash at end: 0x%08X\n", end_hash);
+            fprintf(log_file, "time_ms at end: %llu (delta: %llu ms)\n", 
+                    (unsigned long long)time_ms, 
+                    (unsigned long long)(time_ms - cycle_start_ms));
         }
         
         clock_gettime(CLOCK_MONOTONIC, &cycle_end);
@@ -392,12 +433,14 @@ void run_program(void) {
         long remaining_ms = vm_config.cycle_time_ms - elapsed_ms;
         
         if (logging_enabled && log_file) {
+            fprintf(log_file, "VM elapsed this cycle: %ld ms\n", elapsed_ms);
             fprintf(log_file, "=== CYCLE %u END: %lu instructions in %ld ms ===\n",
                     cycle_count, (unsigned long)total_instr_count, elapsed_ms);
         }
         
-        printf("Cycle %u: %lu instructions, %ld ms elapsed\n", 
-            cycle_count, (unsigned long)total_instr_count, elapsed_ms);
+        printf("Cycle %u: %lu instructions, %ld ms elapsed, time_ms=%llu\n", 
+            cycle_count, (unsigned long)total_instr_count, elapsed_ms, 
+            (unsigned long long)time_ms);
         
         if (remaining_ms > 0) {
             usleep(remaining_ms * 1000);

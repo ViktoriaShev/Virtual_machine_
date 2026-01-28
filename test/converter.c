@@ -152,9 +152,9 @@ static int parse_immediate(const char *tok, int *out_val) {
 static int check_reg_range(int r) {
     return (r >= 0 && r <= 0xFF);
 }
-/* Immediate для 9-bit signed: -256 .. +255 */
-static int check_imm9_range(int v) {
-    return (v >= -256 && v <= 255);
+/* Immediate для 8-bit signed: -128 .. +127 */
+static int check_imm8_range(int v) {
+    return (v >= -128 && v <= 127);
 }
 
 int main(int argc, char** argv) {
@@ -176,7 +176,7 @@ int main(int argc, char** argv) {
     for (OpEntry *e = op_table; e->name; ++e) {
         if (e->cflags & CFLAG_ALLOW_IMM) fprintf(stderr, "%s ", e->name);
     }
-    fprintf(stderr, "\nNote: registers syntax = R<num>, immediate syntax = #<num> (range -256..255 for C)\n");
+    fprintf(stderr, "\nNote: registers syntax = R<num>, immediate syntax = #<num> (range -127..128 for C)\n");
 
     char line[MAX_LINE];
     unsigned long lineno = 0;

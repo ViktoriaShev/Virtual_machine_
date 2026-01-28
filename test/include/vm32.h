@@ -48,7 +48,7 @@ extern uint8_t *mem;
 extern uint32_t reg[REG_COUNT];
 extern uint32_t PC_START;
 extern bool running;
-uint64_t time_ms;   // ⬅️ ГЛОБАЛЬНОЕ ВРЕМЯ VM
+extern uint64_t time_ms;
 
 typedef void (*op_ex_f)(uint32_t instruction);
 extern op_ex_f op_ex[OPCODE_COUNT];

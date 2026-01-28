@@ -1,5 +1,5 @@
 ╔═══════════════════════════════════════════════════════════════╗
-║           VM32 Execution Log - Tue Jan 27 18:58:16 2026
+║           VM32 Execution Log - Wed Jan 28 13:51:55 2026
 ╠═══════════════════════════════════════════════════════════════╣
 ║ Memory: 67108864 bytes (64.00 MB)
 ║ Registers: 256
@@ -7,7 +7,7 @@
 ╚═══════════════════════════════════════════════════════════════╝
 
 
-=== CYCLE 1 START ===
+=== CYCLE 1 START (time_ms=10933382) ===
 Registers hash at start: 0xC021911A
 Initialized prev_cycle_hash = 0xC021911A
 
@@ -396,7 +396,8 @@ Module build/bin/main.bin: executed 0 instructions
 │   R11 (B) = 0x00000005 (5)
 │   R0 (C) = 0x00000005 (5)
 │
-│ Register changes: (none)
+│ Register CHANGES:
+│   R010: 0x00000000 (         0) -> 0x00000001 (         1)
 │
 │ Memory changes: (none)
 │
@@ -409,12 +410,12 @@ Module build/bin/main.bin: executed 0 instructions
 │ Binary: 00000000 00010100 00000100 00000000
 │
 │ Operands BEFORE:
-│   R10 (A) = 0x00000000 (0)
+│   R10 (A) = 0x00000001 (1)
 │   R2 (B) = 0x00000000 (0)
 │   R0 (C) = 0x00000005 (5)
 │
 │ Register CHANGES:
-│   R010: 0x00000000 (         0) -> 0x00000005 (         5)
+│   R010: 0x00000001 (         1) -> 0x00000005 (         5)
 │
 │ Memory changes: (none)
 │
@@ -953,7 +954,9 @@ Module build/bin/main.bin: executed 0 instructions
 
 Module build/bin/timer_test.bin: executed 49 instructions
 Registers hash at end: 0x62CA713B
-=== CYCLE 1 END: 54 instructions in 1 ms ===
+time_ms at end: 10934382 (delta: 1000 ms)
+VM elapsed this cycle: 0 ms
+=== CYCLE 1 END: 54 instructions in 0 ms ===
 
 ╔═══════════════════════════════════════════════════════════════╗
 ║ Execution Summary
