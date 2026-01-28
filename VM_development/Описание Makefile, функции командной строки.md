@@ -225,3 +225,9 @@ Makefile содержит `.PHONY` для целей, которые не соо
     
 
 ---
+
+ / Fuzz** — генерация случайных/мутационных бинарников, проверка на падения/UB.
+    
+6. **Performance / Timing** — проверка, что цикл не выходит за cycle_time_ms, измерение throughput, проверка предупреждений overrun.
+    
+7. **Sanitizers & Static Analysis** — запуск под ASAN/UBSAN/LSAN, статический анализ (clang-tidy).
