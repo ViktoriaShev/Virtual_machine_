@@ -150,6 +150,12 @@ test-decode: dirs
 	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_decode testing/test_decode.c $(VM_SRCS) $(LDFLAGS)
 	./testing/test_decode
 
+test_hashing: dirs
+	$(TEST_CC) $(TEST_CFLAGS) -Iinclude \
+	    -o testing/test_hashing \
+	    testing/test_hashing.c hashing.c \
+	    $(LDFLAGS)
+	./testing/test_hashing
 
 # run all tests (add more dependencies here later)
 test: test-timers

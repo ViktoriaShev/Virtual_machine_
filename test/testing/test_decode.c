@@ -58,6 +58,41 @@ int main(void) {
         report("decode: invalid opcode has no handler (expected)", has_handler == 0);
     }
 
+    // 6) no-immediate instruction must have immediate == 0
+    uint32_t instr_noimm = instr & ~(1u << 23); // сброс FIMM
+    mw32(addr + 8, instr_noimm);
+    decoded_instr_t *d_noimm = vm_decode_instruction(addr + 8);
+
+    report("decode: no-immediate sets immediate == 0",
+        d_noimm && d_noimm->has_immediate == false && d_noimm->immediate == 0);
+    
+    // 7) zero instruction should decode safely
+    mw32(addr + 12, 0x00000000u);
+    decoded_instr_t *dz = vm_decode_instruction(addr + 12);
+
+    report("decode: zero instruction decoded (non-NULL)", dz != NULL);
+    if (dz) {
+        report("decode: zero instr opcode == 0", dz->opcode == 0);
+        report("decode: zero instr has no immediate", dz->has_immediate == false);
+    }
+
+        // 8) different addresses produce different cache entries
+    mw32(addr + 16, instr ^ 0x01020304u);
+    decoded_instr_t *d_other = vm_decode_instruction(addr + 16);
+
+    report("decode: different addr yields different decoded ptr",
+        d_other && d_other != d1);
+
+    // 9) decode cache stress (many instructions)
+    int stress_ok = 1;
+    for (uint32_t off = 0; off < 256; off += 4) {
+        uint32_t a = addr + 0x100 + off;
+        mw32(a, 0xAABB0000u | off);
+        decoded_instr_t *ds = vm_decode_instruction(a);
+        if (!ds) { stress_ok = 0; break; }
+    }
+    report("decode: cache stress (256 instr)", stress_ok);
+
     // cleanup
     vm_tables_destroy();
     free(mem);
