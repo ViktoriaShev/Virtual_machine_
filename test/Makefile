@@ -132,4 +132,23 @@ watch:
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all clean convert run debug watch info dirs
+# =========================================================
+# Tests
+# =========================================================
+TEST_CC := $(HOST_CC)
+TEST_CFLAGS := $(CFLAGS)
+TEST_TARGET := testing/test_timers
+
+# build the timers unit test
+$(TEST_TARGET): testing/test_timers.c timers.c | dirs
+	@mkdir -p testing
+	$(TEST_CC) $(TEST_CFLAGS) -Iinclude -o $@ $^ $(LDFLAGS)
+
+test-timers: $(TEST_TARGET)
+
+# run all tests (add more dependencies here later)
+test: test-timers
+	@echo "Running timers unit tests..."
+	./$(TEST_TARGET)
+
+.PHONY: all clean convert run debug watch info dirs test-timers test
