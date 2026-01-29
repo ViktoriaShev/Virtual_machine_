@@ -146,6 +146,11 @@ $(TEST_TARGET): testing/test_timers.c timers.c | dirs
 
 test-timers: $(TEST_TARGET)
 
+test-decode: dirs
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_decode testing/test_decode.c $(VM_SRCS) $(LDFLAGS)
+	./testing/test_decode
+
+
 # run all tests (add more dependencies here later)
 test: test-timers
 	@echo "Running timers unit tests..."

@@ -121,6 +121,11 @@ static decoded_instr_t *decode_instruction(uint32_t addr) {
     return dec;
 }
 
+/* --- Test helper: exported wrapper to call static decode_instruction() --- */
+decoded_instr_t *vm_decode_instruction(uint32_t addr) {
+    return decode_instruction(addr);
+}
+
 /* Уничтожение/очистка всех таблиц, вызывается при завершении программы.
    Учитывает, что decoded_cache value_type.del == free, поэтому освобождаются
    и структуры decoded_instr_t. */
@@ -551,10 +556,7 @@ void load_programs(const char **fnames, int count) {
         }
     }
 }
-
-/* ----------------------------
-   Точка входа
-   ---------------------------- */
+#ifndef UNIT_TEST
 int main(int argc, char **argv) {
     signal(SIGINT, handle_sigterm);
     signal(SIGTERM, handle_sigterm);
@@ -631,3 +633,5 @@ int main(int argc, char **argv) {
     
     return vm_exit_code;
 }
+
+#endif 

@@ -120,5 +120,7 @@ typedef struct {
 
 extern module_info_t *modules;
 extern size_t module_count;
+/* Тестовый экспорт для decode_instruction */
+decoded_instr_t *vm_decode_instruction(uint32_t addr);
 
 #endif /* VM32_H */
