@@ -150,12 +150,16 @@ test-decode: dirs
 	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_decode testing/test_decode.c $(VM_SRCS) $(LDFLAGS)
 	./testing/test_decode
 
+# hashing unit test: compile only hashing.c + helper header
 test_hashing: dirs
-	$(TEST_CC) $(TEST_CFLAGS) -Iinclude \
-	    -o testing/test_hashing \
-	    testing/test_hashing.c hashing.c \
-	    $(LDFLAGS)
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_hashing testing/test_hashing.c hashing.c $(LDFLAGS)
 	./testing/test_hashing
+
+
+# funcs_alu unit test: compile funcs.c + vm32.c (for reg[], etc.)
+test_funcs_alu:
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_alu testing/test_funcs_alu.c $(VM_SRCS) $(LDFLAGS)
+	./testing/test_funcs_alu
 
 # run all tests (add more dependencies here later)
 test: test-timers
