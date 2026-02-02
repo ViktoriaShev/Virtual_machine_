@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <strings.h> 
 
-
 CT_Counter ctu_counters[16] = {0};
 CT_Counter ctd_counters[16] = {0};
 CT_Counter ctud_counters[16] = {0};

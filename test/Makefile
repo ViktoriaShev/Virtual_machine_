@@ -161,6 +161,14 @@ test_funcs_alu:
 	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_alu testing/test_funcs_alu.c $(VM_SRCS) $(LDFLAGS)
 	./testing/test_funcs_alu
 
+test_funcs_jmp: dirs
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_jmp testing/test_funcs_jmp.c $(VM_SRCS) $(LDFLAGS)
+	./testing/test_funcs_jmp
+
+test_labels: dirs
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_labels testing/test_labels.c $(VM_SRCS) $(LDFLAGS)
+	./testing/test_labels
+
 # run all tests (add more dependencies here later)
 test: test-timers
 	@echo "Running timers unit tests..."

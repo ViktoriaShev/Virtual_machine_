@@ -7,6 +7,7 @@
 #include "hashing.h"
 #include "cleanup.h"
 #include "timers.h"
+#include "vm_tables.h"
 
 #include <stdio.h>
 #include <stdbool.h>

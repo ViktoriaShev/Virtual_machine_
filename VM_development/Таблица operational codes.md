@@ -64,45 +64,45 @@
 
 ## 4. Время и дата (27–38)
 
-|Op|Hex|Bin|Функция|Описание|
-|---|---|---|---|---|
-|27|0x1B|0011011|op_time|A = seconds|
-|28|0x1C|0011100|op_date|A = YYYYMMDD|
-|29|0x1D|0011101|op_tod|A = HHMMSS|
-|30|0x1E|0011110|op_dt|A = YYYYMMDDHH?|
-|31|0x1F|0011111|op_add_time|A = B+C|
-|32|0x20|0100000|op_sub_time|A = B-C|
-|33|0x21|0100001|op_year|A = year|
-|34|0x22|0100010|op_month|A = month|
-|35|0x23|0100011|op_day|A = day|
-|36|0x24|0100100|op_hour|A = hour|
-|37|0x25|0100101|op_minute|A = minute|
-|38|0x26|0100110|op_second|A = second|
+| Op  | Hex  | Bin     | Функция     | Описание        |
+| --- | ---- | ------- | ----------- | --------------- |
+| 27  | 0x1B | 0011011 | op_time     | A = seconds     |
+| 28  | 0x1C | 0011100 | op_date     | A = YYYYMMDD    |
+| 29  | 0x1D | 0011101 | op_tod      | A = HHMMSS      |
+| 30  | 0x1E | 0011110 | op_dt       | A = YYYYMMDDHH? |
+| 31  | 0x1F | 0011111 | op_add_time | A = B+C         |
+| 32  | 0x20 | 0100000 | op_sub_time | A = B-C         |
+| 33  | 0x21 | 0100001 | op_year     | A = year        |
+| 34  | 0x22 | 0100010 | op_month    | A = month       |
+| 35  | 0x23 | 0100011 | op_day      | A = day         |
+| 36  | 0x24 | 0100100 | op_hour     | A = hour        |
+| 37  | 0x25 | 0100101 | op_minute   | A = minute      |
+| 38  | 0x26 | 0100110 | op_second   | A = second      |
 
 ---
 
 ## 5. Строки (39–46)
 
-|Op|Hex|Bin|Функция|Описание|
-|---|---|---|---|---|
-|39|0x27|0100111|op_len|A = len(B)|
-|40|0x28|0101000|op_concat|B = B + C|
-|41|0x29|0101001|op_left|B = left(B, C)|
-|42|0x2A|0101010|op_right|B = right(B, C)|
-|43|0x2B|0101011|op_mid|B = mid(B, C)|
-|44|0x2C|0101100|op_insert|A[pos]+=B|
-|45|0x2D|0101101|op_delete|del A[B,C]|
-|46|0x2E|0101110|op_replace|replace A[B]|
+| Op  | Hex  | Bin     | Функция    | Описание        |
+| --- | ---- | ------- | ---------- | --------------- |
+| 39  | 0x27 | 0100111 | op_len     | A = len(B)      |
+| 40  | 0x28 | 0101000 | op_concat  | B = B + C       |
+| 41  | 0x29 | 0101001 | op_left    | B = left(B, C)  |
+| 42  | 0x2A | 0101010 | op_right   | B = right(B, C) |
+| 43  | 0x2B | 0101011 | op_mid     | B = mid(B, C)   |
+| 44  | 0x2C | 0101100 | op_insert  | A[pos]+=B       |
+| 45  | 0x2D | 0101101 | op_delete  | del A[B,C]      |
+| 46  | 0x2E | 0101110 | op_replace | replace A[B]    |
 
 ---
 
 ## 6. Таймеры (47–49)
 
-|Op|Hex|Bin|Функция|Описание|
-|---|---|---|---|---|
-|47|0x2F|0101111|op_ton|ON delay|
-|48|0x30|0110000|op_tof|OFF delay|
-|49|0x31|0110001|op_tp|Pulse|
+| Op  | Hex  | Bin     | Функция | Описание  |
+| --- | ---- | ------- | ------- | --------- |
+| 47  | 0x2F | 0101111 | op_ton  | ON delay  |
+| 48  | 0x30 | 0110000 | op_tof  | OFF delay |
+| 49  | 0x31 | 0110001 | op_tp   | Pulse     |
 
 ---
 
@@ -135,28 +135,28 @@
 
 ## 10. Переходы (56–58)
 
-|Op|Hex|Bin|Функция|Описание|
-|---|---|---|---|---|
-|56|0x38|0111000|op_jmp|PC = B or imm|
-|57|0x39|0111001|op_jmp_if|if C: PC=B/imm|
-|58|0x3A|0111010|op_jmp_if_not|if !C: PC=B/imm|
+| Op  | Hex  | Bin     | Функция       | Описание        |
+| --- | ---- | ------- | ------------- | --------------- |
+| 56  | 0x38 | 0111000 | op_jmp        | PC = B or imm   |
+| 57  | 0x39 | 0111001 | op_jmp_if     | if C: PC=B/imm  |
+| 58  | 0x3A | 0111010 | op_jmp_if_not | if !C: PC=B/imm |
 
 ---
 
 ## 11. Завершение (59–60)
 
-|Op|Hex|Bin|Функция|Описание|
-|---|---|---|---|---|
-|59|0x3B|0111011|op_exit|exit(code)|
-|60|0x3C|0111100|op_halt|stop VM|
+| Op  | Hex  | Bin     | Функция | Описание   |
+| --- | ---- | ------- | ------- | ---------- |
+| 59  | 0x3B | 0111011 | op_exit | exit(code) |
+| 60  | 0x3C | 0111100 | op_halt | stop VM    |
 
 ---
 
 ## 12. No-op (61)
 
-|Op|Hex|Bin|Функция|Описание|
-|---|---|---|---|---|
-|61|0x3D|0111101|op_nop|Ничего|
+| Op  | Hex  | Bin     | Функция | Описание |
+| --- | ---- | ------- | ------- | -------- |
+| 61  | 0x3D | 0111101 | op_nop  | Ничего   |
 
 ---
 
