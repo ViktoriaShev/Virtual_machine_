@@ -151,26 +151,29 @@ test-decode: dirs
 	./testing/test_decode
 
 # hashing unit test: compile only hashing.c + helper header
-test_hashing: dirs
+test-hashing: dirs
 	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_hashing testing/test_hashing.c hashing.c $(LDFLAGS)
 	./testing/test_hashing
 
-
 # funcs_alu unit test: compile funcs.c + vm32.c (for reg[], etc.)
-test_funcs_alu:
+test-funcs-alu:
 	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_alu testing/test_funcs_alu.c $(VM_SRCS) $(LDFLAGS)
 	./testing/test_funcs_alu
 
-test_funcs_jmp: dirs
+test-funcs-jmp: dirs
 	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_jmp testing/test_funcs_jmp.c $(VM_SRCS) $(LDFLAGS)
 	./testing/test_funcs_jmp
 
-test_labels: dirs
+test-labels: dirs
 	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_labels testing/test_labels.c $(VM_SRCS) $(LDFLAGS)
 	./testing/test_labels
 
+test-funcs-string: dirs
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_string testing/test_funcs_string.c $(VM_SRCS) $(LDFLAGS)
+	./testing/test_funcs_string
+
 # run all tests (add more dependencies here later)
-test: test-timers
+test: test-timers test-decode test-hashing test-funcs-alu test-funcs-jmp test-labels test-funcs-string
 	@echo "Running timers unit tests..."
 	./$(TEST_TARGET)
 
