@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <strings.h> 
+#include <math.h>
 
 CT_Counter ctu_counters[16] = {0};
 CT_Counter ctd_counters[16] = {0};

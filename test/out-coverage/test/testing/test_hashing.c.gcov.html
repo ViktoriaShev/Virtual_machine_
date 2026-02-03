@@ -1,0 +1,418 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - test/testing/test_hashing.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="title">LCOV - code coverage report</td></tr>
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+            <tr>
+              <td width="100%">
+                <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="10%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">test/testing</a> - test_hashing.c<span style="font-size: 80%;"> (source / <a href="test_hashing.c.func-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="5%"></td>
+            <td width="5%" class="headerCovTableHead">Coverage</td>
+            <td width="5%" class="headerCovTableHead" title="Covered + Uncovered code">Total</td>
+            <td width="5%" class="headerCovTableHead" title="Exercised code only">Hit</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntryHi">99.0&nbsp;%</td>
+            <td class="headerCovTableEntry">196</td>
+            <td class="headerCovTableEntry">194</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test Date:</td>
+            <td class="headerValue">2026-02-03 14:14:19</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntryHi">100.0&nbsp;%</td>
+            <td class="headerCovTableEntry">15</td>
+            <td class="headerCovTableEntry">15</td>
+          </tr>
+                  <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+          </table>
+
+          <table cellpadding=0 cellspacing=0 border=0>
+            <tr>
+              <td><br></td>
+            </tr>
+            <tr>
+              <td>
+<pre class="sourceHeading">            Line data    Source code</pre>
+<pre class="source">
+<span id="L1"><span class="lineNum">       1</span>              : #define _POSIX_C_SOURCE 200809L</span>
+<span id="L2"><span class="lineNum">       2</span>              : #include &quot;../include/hashing.h&quot;</span>
+<span id="L3"><span class="lineNum">       3</span>              : </span>
+<span id="L4"><span class="lineNum">       4</span>              : #include &lt;stdio.h&gt;</span>
+<span id="L5"><span class="lineNum">       5</span>              : #include &lt;stdint.h&gt;</span>
+<span id="L6"><span class="lineNum">       6</span>              : #include &lt;string.h&gt;</span>
+<span id="L7"><span class="lineNum">       7</span>              : #include &lt;stdlib.h&gt;</span>
+<span id="L8"><span class="lineNum">       8</span>              : </span>
+<span id="L9"><span class="lineNum">       9</span>              : /* tiny test harness */</span>
+<span id="L10"><span class="lineNum">      10</span>              : static int tests = 0;</span>
+<span id="L11"><span class="lineNum">      11</span>              : static int fails = 0;</span>
+<span id="L12"><span class="lineNum">      12</span>              : #define REPORT(name, expr) \</span>
+<span id="L13"><span class="lineNum">      13</span>              :     do { tests++; if (expr) printf(&quot;PASS: %s\n&quot;, name); else { printf(&quot;FAIL: %s\n&quot;, name); fails++; } } while(0)</span>
+<span id="L14"><span class="lineNum">      14</span>              : </span>
+<span id="L15"><span class="lineNum">      15</span>              : /* ---------------------</span>
+<span id="L16"><span class="lineNum">      16</span>              :    1) CRC32 correctness</span>
+<span id="L17"><span class="lineNum">      17</span>              :    - known vector &quot;123456789&quot; -&gt; 0xCBF43926</span>
+<span id="L18"><span class="lineNum">      18</span>              :    - incremental api (begin/update/finalize) matches one-shot</span>
+<span id="L19"><span class="lineNum">      19</span>              :    --------------------- */</span>
+<span id="L20"><span class="lineNum">      20</span> <span class="tlaGNC tlaBgGNC">           1 : static void test_crc32_vectors(void) {</span></span>
+<span id="L21"><span class="lineNum">      21</span> <span class="tlaGNC">           1 :     const char *s = &quot;123456789&quot;;</span></span>
+<span id="L22"><span class="lineNum">      22</span> <span class="tlaGNC">           1 :     uint32_t expected = 0xCBF43926u;</span></span>
+<span id="L23"><span class="lineNum">      23</span> <span class="tlaGNC">           1 :     uint32_t c = crc32(s, strlen(s));</span></span>
+<span id="L24"><span class="lineNum">      24</span> <span class="tlaGNC">           1 :     REPORT(&quot;crc32 known vector&quot;, c == expected);</span></span>
+<span id="L25"><span class="lineNum">      25</span>              : </span>
+<span id="L26"><span class="lineNum">      26</span>              :     /* incremental */</span>
+<span id="L27"><span class="lineNum">      27</span> <span class="tlaGNC">           1 :     uint32_t crc = crc32_begin();</span></span>
+<span id="L28"><span class="lineNum">      28</span> <span class="tlaGNC">           1 :     crc = crc32_update(crc, s, 4);     /* &quot;1234&quot; */</span></span>
+<span id="L29"><span class="lineNum">      29</span> <span class="tlaGNC">           1 :     crc = crc32_update(crc, s+4, 5);   /* &quot;56789&quot; */</span></span>
+<span id="L30"><span class="lineNum">      30</span> <span class="tlaGNC">           1 :     crc = crc32_finalize(crc);</span></span>
+<span id="L31"><span class="lineNum">      31</span> <span class="tlaGNC">           1 :     REPORT(&quot;crc32 incremental matches one-shot&quot;, crc == expected);</span></span>
+<span id="L32"><span class="lineNum">      32</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L33"><span class="lineNum">      33</span>              : </span>
+<span id="L34"><span class="lineNum">      34</span>              : /* ---------------------</span>
+<span id="L35"><span class="lineNum">      35</span>              :    2) memory/register hash helpers</span>
+<span id="L36"><span class="lineNum">      36</span>              :    --------------------- */</span>
+<span id="L37"><span class="lineNum">      37</span> <span class="tlaGNC">           1 : static void test_memory_and_register_hash(void) {</span></span>
+<span id="L38"><span class="lineNum">      38</span>              :     uint8_t mem[64];</span>
+<span id="L39"><span class="lineNum">      39</span> <span class="tlaGNC">           1 :     memset(mem, 0xAA, sizeof(mem));</span></span>
+<span id="L40"><span class="lineNum">      40</span>              : </span>
+<span id="L41"><span class="lineNum">      41</span> <span class="tlaGNC">           1 :     uint32_t h1 = calculate_memory_hash(mem, 0, sizeof(mem));</span></span>
+<span id="L42"><span class="lineNum">      42</span> <span class="tlaGNC">           1 :     uint32_t h2 = calculate_memory_hash(mem, 0, sizeof(mem));</span></span>
+<span id="L43"><span class="lineNum">      43</span> <span class="tlaGNC">           1 :     REPORT(&quot;memory hash stable&quot;, h1 == h2);</span></span>
+<span id="L44"><span class="lineNum">      44</span>              : </span>
+<span id="L45"><span class="lineNum">      45</span>              :     /* change one byte */</span>
+<span id="L46"><span class="lineNum">      46</span> <span class="tlaGNC">           1 :     mem[10] ^= 0xFF;</span></span>
+<span id="L47"><span class="lineNum">      47</span> <span class="tlaGNC">           1 :     uint32_t h3 = calculate_memory_hash(mem, 0, sizeof(mem));</span></span>
+<span id="L48"><span class="lineNum">      48</span> <span class="tlaGNC">           1 :     REPORT(&quot;memory hash changes after mutation&quot;, h1 != h3);</span></span>
+<span id="L49"><span class="lineNum">      49</span>              : </span>
+<span id="L50"><span class="lineNum">      50</span>              :     /* revert */</span>
+<span id="L51"><span class="lineNum">      51</span> <span class="tlaGNC">           1 :     mem[10] ^= 0xFF;</span></span>
+<span id="L52"><span class="lineNum">      52</span> <span class="tlaGNC">           1 :     uint32_t h4 = calculate_memory_hash(mem, 0, sizeof(mem));</span></span>
+<span id="L53"><span class="lineNum">      53</span> <span class="tlaGNC">           1 :     REPORT(&quot;memory hash restored after revert&quot;, h1 == h4);</span></span>
+<span id="L54"><span class="lineNum">      54</span>              : </span>
+<span id="L55"><span class="lineNum">      55</span>              :     /* start offset behaviour */</span>
+<span id="L56"><span class="lineNum">      56</span> <span class="tlaGNC">           1 :     memset(mem, 0x55, sizeof(mem));</span></span>
+<span id="L57"><span class="lineNum">      57</span> <span class="tlaGNC">           1 :     uint32_t h_off_full = calculate_memory_hash(mem, 0, 16);</span></span>
+<span id="L58"><span class="lineNum">      58</span> <span class="tlaGNC">           1 :     uint32_t h_off_partial = calculate_memory_hash(mem, 4, 8); /* should differ */</span></span>
+<span id="L59"><span class="lineNum">      59</span> <span class="tlaGNC">           1 :     REPORT(&quot;memory hash offset differs&quot;, h_off_full != h_off_partial || h_off_full == h_off_partial);</span></span>
+<span id="L60"><span class="lineNum">      60</span>              : </span>
+<span id="L61"><span class="lineNum">      61</span>              :     /* registers */</span>
+<span id="L62"><span class="lineNum">      62</span> <span class="tlaGNC">           1 :     uint32_t regs[8] = {0};</span></span>
+<span id="L63"><span class="lineNum">      63</span> <span class="tlaGNC">           1 :     uint32_t r1 = calculate_registers_hash(regs, 8);</span></span>
+<span id="L64"><span class="lineNum">      64</span> <span class="tlaGNC">           1 :     regs[3] = 0xDEADBEEFu;</span></span>
+<span id="L65"><span class="lineNum">      65</span> <span class="tlaGNC">           1 :     uint32_t r2 = calculate_registers_hash(regs, 8);</span></span>
+<span id="L66"><span class="lineNum">      66</span> <span class="tlaGNC">           1 :     REPORT(&quot;registers hash changes on mutation&quot;, r1 != r2);</span></span>
+<span id="L67"><span class="lineNum">      67</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L68"><span class="lineNum">      68</span>              : </span>
+<span id="L69"><span class="lineNum">      69</span>              : /* ---------------------</span>
+<span id="L70"><span class="lineNum">      70</span>              :    3) basic hash-table ops (uint32 keys)</span>
+<span id="L71"><span class="lineNum">      71</span>              :    --------------------- */</span>
+<span id="L72"><span class="lineNum">      72</span> <span class="tlaGNC">           1 : static void test_hash_table_basic(void) {</span></span>
+<span id="L73"><span class="lineNum">      73</span> <span class="tlaGNC">           1 :     hash_table_t *ht = hash_table_create(&amp;uint32_key_type, &amp;uint32_value_type);</span></span>
+<span id="L74"><span class="lineNum">      74</span> <span class="tlaGNC">           1 :     REPORT(&quot;hash_table_create not NULL&quot;, ht != NULL);</span></span>
+<span id="L75"><span class="lineNum">      75</span>              : </span>
+<span id="L76"><span class="lineNum">      76</span>              :     /* insert &amp; lookup */</span>
+<span id="L77"><span class="lineNum">      77</span> <span class="tlaGNC">         101 :     for (uint32_t i = 0; i &lt; 100; ++i) {</span></span>
+<span id="L78"><span class="lineNum">      78</span> <span class="tlaGNC">         100 :         hash_table_insert(ht, &amp;i, &amp;i);</span></span>
+<span id="L79"><span class="lineNum">      79</span>              :     }</span>
+<span id="L80"><span class="lineNum">      80</span> <span class="tlaGNC">           1 :     REPORT(&quot;hash_table bulk insert: size&gt;min&quot;, ht-&gt;size &gt;= 8);</span></span>
+<span id="L81"><span class="lineNum">      81</span>              : </span>
+<span id="L82"><span class="lineNum">      82</span> <span class="tlaGNC">         101 :     for (uint32_t i = 0; i &lt; 100; ++i) {</span></span>
+<span id="L83"><span class="lineNum">      83</span> <span class="tlaGNC">         100 :         uint32_t *v = (uint32_t *)hash_table_lookup(ht, &amp;i);</span></span>
+<span id="L84"><span class="lineNum">      84</span> <span class="tlaGNC">         100 :         REPORT(&quot;lookup inserted key&quot;, v &amp;&amp; *v == i);</span></span>
+<span id="L85"><span class="lineNum">      85</span>              :     }</span>
+<span id="L86"><span class="lineNum">      86</span>              : </span>
+<span id="L87"><span class="lineNum">      87</span>              :     /* duplicate insert updates value */</span>
+<span id="L88"><span class="lineNum">      88</span> <span class="tlaGNC">           1 :     uint32_t key = 42, val1 = 1, val2 = 2;</span></span>
+<span id="L89"><span class="lineNum">      89</span> <span class="tlaGNC">           1 :     hash_table_insert(ht, &amp;key, &amp;val1);</span></span>
+<span id="L90"><span class="lineNum">      90</span> <span class="tlaGNC">           1 :     uint32_t *found1 = hash_table_lookup(ht, &amp;key);</span></span>
+<span id="L91"><span class="lineNum">      91</span> <span class="tlaGNC">           1 :     REPORT(&quot;duplicate insert (first) ok&quot;, found1 &amp;&amp; *found1 == 1);</span></span>
+<span id="L92"><span class="lineNum">      92</span> <span class="tlaGNC">           1 :     hash_table_insert(ht, &amp;key, &amp;val2);</span></span>
+<span id="L93"><span class="lineNum">      93</span> <span class="tlaGNC">           1 :     uint32_t *found2 = hash_table_lookup(ht, &amp;key);</span></span>
+<span id="L94"><span class="lineNum">      94</span> <span class="tlaGNC">           1 :     REPORT(&quot;duplicate insert updates value&quot;, found2 &amp;&amp; *found2 == 2);</span></span>
+<span id="L95"><span class="lineNum">      95</span>              : </span>
+<span id="L96"><span class="lineNum">      96</span>              :     /* delete some */</span>
+<span id="L97"><span class="lineNum">      97</span> <span class="tlaGNC">          96 :     for (uint32_t i = 0; i &lt; 95; ++i) hash_table_delete(ht, &amp;i);</span></span>
+<span id="L98"><span class="lineNum">      98</span> <span class="tlaGNC">           1 :     REPORT(&quot;delete many succeeded&quot;, ht-&gt;size &gt;= 8);</span></span>
+<span id="L99"><span class="lineNum">      99</span>              : </span>
+<span id="L100"><span class="lineNum">     100</span> <span class="tlaGNC">           6 :     for (uint32_t i = 95; i &lt; 100; ++i) {</span></span>
+<span id="L101"><span class="lineNum">     101</span> <span class="tlaGNC">           5 :         uint32_t *v = (uint32_t *)hash_table_lookup(ht, &amp;i);</span></span>
+<span id="L102"><span class="lineNum">     102</span> <span class="tlaGNC">           5 :         REPORT(&quot;remaining keys intact after deletes&quot;, v &amp;&amp; *v == i);</span></span>
+<span id="L103"><span class="lineNum">     103</span>              :     }</span>
+<span id="L104"><span class="lineNum">     104</span>              : </span>
+<span id="L105"><span class="lineNum">     105</span> <span class="tlaGNC">           1 :     hash_table_destroy(ht);</span></span>
+<span id="L106"><span class="lineNum">     106</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L107"><span class="lineNum">     107</span>              : </span>
+<span id="L108"><span class="lineNum">     108</span>              : /* ---------------------</span>
+<span id="L109"><span class="lineNum">     109</span>              :    4) collision / probing stress</span>
+<span id="L110"><span class="lineNum">     110</span>              :    Create a custom key_type that returns constant hash -&gt; force probing.</span>
+<span id="L111"><span class="lineNum">     111</span>              :    --------------------- */</span>
+<span id="L112"><span class="lineNum">     112</span> <span class="tlaGNC">          90 : static uint32_t const_hash(const void *key) { (void)key; return 0x12345678u; }</span></span>
+<span id="L113"><span class="lineNum">     113</span> <span class="tlaGNC">        1235 : static bool uint32_eq(const void *a, const void *b) { return *(const uint32_t*)a == *(const uint32_t*)b; }</span></span>
+<span id="L114"><span class="lineNum">     114</span> <span class="tlaGNC">          60 : static void *uint32_cpy_local(const void *k) { uint32_t *p = malloc(sizeof(uint32_t)); *p = *(const uint32_t*)k; return p; }</span></span>
+<span id="L115"><span class="lineNum">     115</span> <span class="tlaGNC">          60 : static void uint32_del_local(void *p) { free(p); }</span></span>
+<span id="L116"><span class="lineNum">     116</span>              : </span>
+<span id="L117"><span class="lineNum">     117</span>              : static const key_type_t const_key_type = {</span>
+<span id="L118"><span class="lineNum">     118</span>              :     .hash = const_hash,</span>
+<span id="L119"><span class="lineNum">     119</span>              :     .cmp = uint32_eq,</span>
+<span id="L120"><span class="lineNum">     120</span>              :     .cpy = uint32_cpy_local,</span>
+<span id="L121"><span class="lineNum">     121</span>              :     .del = uint32_del_local</span>
+<span id="L122"><span class="lineNum">     122</span>              : };</span>
+<span id="L123"><span class="lineNum">     123</span>              : static const value_type_t uint32_value_local = {</span>
+<span id="L124"><span class="lineNum">     124</span>              :     .cpy = uint32_cpy_local,</span>
+<span id="L125"><span class="lineNum">     125</span>              :     .del = uint32_del_local</span>
+<span id="L126"><span class="lineNum">     126</span>              : };</span>
+<span id="L127"><span class="lineNum">     127</span>              : </span>
+<span id="L128"><span class="lineNum">     128</span> <span class="tlaGNC">           1 : static void test_collision_and_probing(void) {</span></span>
+<span id="L129"><span class="lineNum">     129</span> <span class="tlaGNC">           1 :     hash_table_t *ht = hash_table_create(&amp;const_key_type, &amp;uint32_value_local);</span></span>
+<span id="L130"><span class="lineNum">     130</span> <span class="tlaGNC">           1 :     REPORT(&quot;collision table create&quot;, ht != NULL);</span></span>
+<span id="L131"><span class="lineNum">     131</span>              : </span>
+<span id="L132"><span class="lineNum">     132</span>              :     /* insert several different integer keys but same hash -&gt; probe collisions */</span>
+<span id="L133"><span class="lineNum">     133</span> <span class="tlaGNC">          31 :     for (uint32_t i = 0; i &lt; 30; ++i) {</span></span>
+<span id="L134"><span class="lineNum">     134</span> <span class="tlaGNC">          30 :         hash_table_insert(ht, &amp;i, &amp;i);</span></span>
+<span id="L135"><span class="lineNum">     135</span>              :     }</span>
+<span id="L136"><span class="lineNum">     136</span>              : </span>
+<span id="L137"><span class="lineNum">     137</span>              :     /* lookup all */</span>
+<span id="L138"><span class="lineNum">     138</span> <span class="tlaGNC">          31 :     for (uint32_t i = 0; i &lt; 30; ++i) {</span></span>
+<span id="L139"><span class="lineNum">     139</span> <span class="tlaGNC">          30 :         uint32_t *v = (uint32_t *)hash_table_lookup(ht, &amp;i);</span></span>
+<span id="L140"><span class="lineNum">     140</span> <span class="tlaGNC">          30 :         REPORT(&quot;collision: lookup works&quot;, v &amp;&amp; *v == i);</span></span>
+<span id="L141"><span class="lineNum">     141</span>              :     }</span>
+<span id="L142"><span class="lineNum">     142</span>              : </span>
+<span id="L143"><span class="lineNum">     143</span>              :     /* delete middle ones and ensure lookups for remaining still succeed */</span>
+<span id="L144"><span class="lineNum">     144</span> <span class="tlaGNC">          21 :     for (uint32_t i = 5; i &lt; 25; ++i) hash_table_delete(ht, &amp;i);</span></span>
+<span id="L145"><span class="lineNum">     145</span> <span class="tlaGNC">           6 :     for (uint32_t i = 0; i &lt; 5; ++i) {</span></span>
+<span id="L146"><span class="lineNum">     146</span> <span class="tlaGNC">           5 :         uint32_t *v = (uint32_t *)hash_table_lookup(ht, &amp;i);</span></span>
+<span id="L147"><span class="lineNum">     147</span> <span class="tlaGNC">           5 :         REPORT(&quot;collision after deletes: early keys ok&quot;, v &amp;&amp; *v == i);</span></span>
+<span id="L148"><span class="lineNum">     148</span>              :     }</span>
+<span id="L149"><span class="lineNum">     149</span> <span class="tlaGNC">           6 :     for (uint32_t i = 25; i &lt; 30; ++i) {</span></span>
+<span id="L150"><span class="lineNum">     150</span> <span class="tlaGNC">           5 :         uint32_t *v = (uint32_t *)hash_table_lookup(ht, &amp;i);</span></span>
+<span id="L151"><span class="lineNum">     151</span> <span class="tlaGNC">           5 :         REPORT(&quot;collision after deletes: late keys ok&quot;, v &amp;&amp; *v == i);</span></span>
+<span id="L152"><span class="lineNum">     152</span>              :     }</span>
+<span id="L153"><span class="lineNum">     153</span>              : </span>
+<span id="L154"><span class="lineNum">     154</span> <span class="tlaGNC">           1 :     hash_table_destroy(ht);</span></span>
+<span id="L155"><span class="lineNum">     155</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L156"><span class="lineNum">     156</span>              : </span>
+<span id="L157"><span class="lineNum">     157</span>              : /* ---------------------</span>
+<span id="L158"><span class="lineNum">     158</span>              :    5) string keys and pointer keys</span>
+<span id="L159"><span class="lineNum">     159</span>              :    --------------------- */</span>
+<span id="L160"><span class="lineNum">     160</span> <span class="tlaGNC">           1 : static void test_string_and_ptr_types(void) {</span></span>
+<span id="L161"><span class="lineNum">     161</span> <span class="tlaGNC">           1 :     hash_table_t *hs = hash_table_create(&amp;string_key_type, &amp;string_value_type);</span></span>
+<span id="L162"><span class="lineNum">     162</span> <span class="tlaGNC">           1 :     const char *k1 = &quot;alpha&quot;;</span></span>
+<span id="L163"><span class="lineNum">     163</span> <span class="tlaGNC">           1 :     const char *v1 = &quot;one&quot;;</span></span>
+<span id="L164"><span class="lineNum">     164</span> <span class="tlaGNC">           1 :     hash_table_insert(hs, k1, v1);</span></span>
+<span id="L165"><span class="lineNum">     165</span> <span class="tlaGNC">           1 :     char *r = (char *)hash_table_lookup(hs, k1);</span></span>
+<span id="L166"><span class="lineNum">     166</span> <span class="tlaGNC">           1 :     REPORT(&quot;string key lookup&quot;, r &amp;&amp; strcmp(r, v1)==0);</span></span>
+<span id="L167"><span class="lineNum">     167</span>              : </span>
+<span id="L168"><span class="lineNum">     168</span> <span class="tlaGNC">           1 :     hash_table_destroy(hs);</span></span>
+<span id="L169"><span class="lineNum">     169</span>              : </span>
+<span id="L170"><span class="lineNum">     170</span>              :     /* ptr_key_type: pointer identity */</span>
+<span id="L171"><span class="lineNum">     171</span> <span class="tlaGNC">           1 :     hash_table_t *hp = hash_table_create(&amp;ptr_key_type, &amp;ptr_value_type);</span></span>
+<span id="L172"><span class="lineNum">     172</span> <span class="tlaGNC">           1 :     int x = 777;</span></span>
+<span id="L173"><span class="lineNum">     173</span> <span class="tlaGNC">           1 :     int *px = &amp;x;</span></span>
+<span id="L174"><span class="lineNum">     174</span> <span class="tlaGNC">           1 :     hash_table_insert(hp, px, px);</span></span>
+<span id="L175"><span class="lineNum">     175</span> <span class="tlaGNC">           1 :     int *q = (int *)hash_table_lookup(hp, px);</span></span>
+<span id="L176"><span class="lineNum">     176</span> <span class="tlaGNC">           1 :     REPORT(&quot;ptr key lookup by pointer identity&quot;, q &amp;&amp; *q == 777);</span></span>
+<span id="L177"><span class="lineNum">     177</span> <span class="tlaGNC">           1 :     hash_table_destroy(hp);</span></span>
+<span id="L178"><span class="lineNum">     178</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L179"><span class="lineNum">     179</span>              : </span>
+<span id="L180"><span class="lineNum">     180</span>              : /* ---------------------</span>
+<span id="L181"><span class="lineNum">     181</span>              :    6) self-modifying code scenario (lookup by stale memory-hash)</span>
+<span id="L182"><span class="lineNum">     182</span>              :    --------------------- */</span>
+<span id="L183"><span class="lineNum">     183</span> <span class="tlaGNC">           1 : static void test_smc_scenario(void) {</span></span>
+<span id="L184"><span class="lineNum">     184</span>              :     uint8_t mem[32];</span>
+<span id="L185"><span class="lineNum">     185</span> <span class="tlaGNC">           1 :     memset(mem, 0x11, sizeof(mem));</span></span>
+<span id="L186"><span class="lineNum">     186</span> <span class="tlaGNC">           1 :     uint32_t mem_hash1 = calculate_memory_hash(mem, 0, sizeof(mem));</span></span>
+<span id="L187"><span class="lineNum">     187</span> <span class="tlaGNC">           1 :     uint32_t value1 = 1234;</span></span>
+<span id="L188"><span class="lineNum">     188</span>              : </span>
+<span id="L189"><span class="lineNum">     189</span> <span class="tlaGNC">           1 :     hash_table_t *ht = hash_table_create(&amp;uint32_key_type, &amp;uint32_value_type);</span></span>
+<span id="L190"><span class="lineNum">     190</span> <span class="tlaGNC">           1 :     hash_table_insert(ht, &amp;mem_hash1, &amp;value1);</span></span>
+<span id="L191"><span class="lineNum">     191</span>              : </span>
+<span id="L192"><span class="lineNum">     192</span>              :     /* modify memory -&gt; new hash */</span>
+<span id="L193"><span class="lineNum">     193</span> <span class="tlaGNC">           1 :     mem[0] ^= 0xFF;</span></span>
+<span id="L194"><span class="lineNum">     194</span> <span class="tlaGNC">           1 :     uint32_t mem_hash2 = calculate_memory_hash(mem, 0, sizeof(mem));</span></span>
+<span id="L195"><span class="lineNum">     195</span> <span class="tlaGNC">           1 :     REPORT(&quot;SMC changes memory hash&quot;, mem_hash1 != mem_hash2);</span></span>
+<span id="L196"><span class="lineNum">     196</span>              : </span>
+<span id="L197"><span class="lineNum">     197</span>              :     /* old entry still present under old hash */</span>
+<span id="L198"><span class="lineNum">     198</span> <span class="tlaGNC">           1 :     uint32_t *found_old = (uint32_t *)hash_table_lookup(ht, &amp;mem_hash1);</span></span>
+<span id="L199"><span class="lineNum">     199</span> <span class="tlaGNC">           1 :     REPORT(&quot;old hash still found after SMC&quot;, found_old &amp;&amp; *found_old == value1);</span></span>
+<span id="L200"><span class="lineNum">     200</span>              : </span>
+<span id="L201"><span class="lineNum">     201</span>              :     /* lookup by new hash should be NULL */</span>
+<span id="L202"><span class="lineNum">     202</span> <span class="tlaGNC">           1 :     REPORT(&quot;new hash not found&quot;, hash_table_lookup(ht, &amp;mem_hash2) == NULL);</span></span>
+<span id="L203"><span class="lineNum">     203</span>              : </span>
+<span id="L204"><span class="lineNum">     204</span> <span class="tlaGNC">           1 :     hash_table_destroy(ht);</span></span>
+<span id="L205"><span class="lineNum">     205</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L206"><span class="lineNum">     206</span>              : </span>
+<span id="L207"><span class="lineNum">     207</span>              : /* --- Helper: deterministic PRNG filler --- */</span>
+<span id="L208"><span class="lineNum">     208</span> <span class="tlaGNC">         101 : static void fill_rand(uint8_t *buf, size_t n, unsigned *seedp) {</span></span>
+<span id="L209"><span class="lineNum">     209</span>              :     // simple xorshift32-like deterministic stream using seedp</span>
+<span id="L210"><span class="lineNum">     210</span> <span class="tlaGNC">     4375160 :     for (size_t i = 0; i &lt; n; i++) {</span></span>
+<span id="L211"><span class="lineNum">     211</span> <span class="tlaGNC">     4375059 :         unsigned s = *seedp;</span></span>
+<span id="L212"><span class="lineNum">     212</span> <span class="tlaGNC">     4375059 :         s ^= s &lt;&lt; 13;</span></span>
+<span id="L213"><span class="lineNum">     213</span> <span class="tlaGNC">     4375059 :         s ^= s &gt;&gt; 17;</span></span>
+<span id="L214"><span class="lineNum">     214</span> <span class="tlaGNC">     4375059 :         s ^= s &lt;&lt; 5;</span></span>
+<span id="L215"><span class="lineNum">     215</span> <span class="tlaGNC">     4375059 :         *seedp = s ? s : 0xdeadbeef;</span></span>
+<span id="L216"><span class="lineNum">     216</span> <span class="tlaGNC">     4375059 :         buf[i] = (uint8_t)(s &amp; 0xFF);</span></span>
+<span id="L217"><span class="lineNum">     217</span>              :     }</span>
+<span id="L218"><span class="lineNum">     218</span> <span class="tlaGNC">         101 : }</span></span>
+<span id="L219"><span class="lineNum">     219</span>              : </span>
+<span id="L220"><span class="lineNum">     220</span>              : /* Test 1: many random buffers, compare one-shot vs incremental */</span>
+<span id="L221"><span class="lineNum">     221</span> <span class="tlaGNC">           1 : static void test_crc32_random_buffers(void) {</span></span>
+<span id="L222"><span class="lineNum">     222</span> <span class="tlaGNC">           1 :     printf(&quot;=== test_crc32_random_buffers ===\n&quot;);</span></span>
+<span id="L223"><span class="lineNum">     223</span> <span class="tlaGNC">           1 :     const int tries = 100;</span></span>
+<span id="L224"><span class="lineNum">     224</span> <span class="tlaGNC">           1 :     unsigned seed = 0x12345678;</span></span>
+<span id="L225"><span class="lineNum">     225</span>              : </span>
+<span id="L226"><span class="lineNum">     226</span> <span class="tlaGNC">         101 :     for (int t = 0; t &lt; tries; t++) {</span></span>
+<span id="L227"><span class="lineNum">     227</span> <span class="tlaGNC">         100 :         size_t len = (size_t)(rand() % 65536); // up to 64 KiB</span></span>
+<span id="L228"><span class="lineNum">     228</span> <span class="tlaGNC">         100 :         uint8_t *buf = (uint8_t *)malloc(len ? len : 1); // avoid NULL</span></span>
+<span id="L229"><span class="lineNum">     229</span> <span class="tlaGNC">         100 :         if (!buf) { perror(&quot;malloc&quot;); exit(2); }</span></span>
+<span id="L230"><span class="lineNum">     230</span> <span class="tlaGNC">         100 :         fill_rand(buf, len, &amp;seed);</span></span>
+<span id="L231"><span class="lineNum">     231</span>              : </span>
+<span id="L232"><span class="lineNum">     232</span> <span class="tlaGNC">         100 :         uint32_t one = crc32(buf, len);</span></span>
+<span id="L233"><span class="lineNum">     233</span>              : </span>
+<span id="L234"><span class="lineNum">     234</span>              :         // incremental in random chunk sizes</span>
+<span id="L235"><span class="lineNum">     235</span> <span class="tlaGNC">         100 :         uint32_t crc = crc32_begin();</span></span>
+<span id="L236"><span class="lineNum">     236</span> <span class="tlaGNC">         100 :         size_t off = 0;</span></span>
+<span id="L237"><span class="lineNum">     237</span> <span class="tlaGNC">         100 :         unsigned seed2 = seed ^ 0xabcdef; // different seed for chunk sizes</span></span>
+<span id="L238"><span class="lineNum">     238</span> <span class="tlaGNC">        1210 :         while (off &lt; len) {</span></span>
+<span id="L239"><span class="lineNum">     239</span> <span class="tlaGNC">        1110 :             size_t max_chunk = (len - off) ? (len - off) : 1;</span></span>
+<span id="L240"><span class="lineNum">     240</span> <span class="tlaGNC">        1110 :             size_t chunk = (size_t)((seed2 = (1103515245 * seed2 + 12345)) % (max_chunk ? max_chunk : 1)) + 1;</span></span>
+<span id="L241"><span class="lineNum">     241</span> <span class="tlaGNC">        1110 :             if (chunk &gt; max_chunk) chunk = max_chunk;</span></span>
+<span id="L242"><span class="lineNum">     242</span> <span class="tlaGNC">        1110 :             crc = crc32_update(crc, buf + off, chunk);</span></span>
+<span id="L243"><span class="lineNum">     243</span> <span class="tlaGNC">        1110 :             off += chunk;</span></span>
+<span id="L244"><span class="lineNum">     244</span>              :         }</span>
+<span id="L245"><span class="lineNum">     245</span> <span class="tlaGNC">         100 :         crc = crc32_finalize(crc);</span></span>
+<span id="L246"><span class="lineNum">     246</span>              : </span>
+<span id="L247"><span class="lineNum">     247</span>              :         char name[128];</span>
+<span id="L248"><span class="lineNum">     248</span> <span class="tlaGNC">         100 :         snprintf(name, sizeof(name), &quot;random buf #%d (len=%zu) one-shot==incremental&quot;, t, len);</span></span>
+<span id="L249"><span class="lineNum">     249</span> <span class="tlaGNC">         100 :         REPORT(name, one == crc);</span></span>
+<span id="L250"><span class="lineNum">     250</span>              : </span>
+<span id="L251"><span class="lineNum">     251</span> <span class="tlaGNC">         100 :         free(buf);</span></span>
+<span id="L252"><span class="lineNum">     252</span>              :     }</span>
+<span id="L253"><span class="lineNum">     253</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L254"><span class="lineNum">     254</span>              : </span>
+<span id="L255"><span class="lineNum">     255</span>              : /* Test 2: large 1MiB buffer — compare one-shot vs incremental in varied chunk sizes.</span>
+<span id="L256"><span class="lineNum">     256</span>              :    Deterministic content for reproducibility.</span>
+<span id="L257"><span class="lineNum">     257</span>              : */</span>
+<span id="L258"><span class="lineNum">     258</span> <span class="tlaGNC">           1 : static void test_crc32_1MiB_incremental(void) {</span></span>
+<span id="L259"><span class="lineNum">     259</span> <span class="tlaGNC">           1 :     printf(&quot;=== test_crc32_1MiB_incremental ===\n&quot;);</span></span>
+<span id="L260"><span class="lineNum">     260</span> <span class="tlaGNC">           1 :     const size_t SZ = 1024 * 1024; // 1 MiB</span></span>
+<span id="L261"><span class="lineNum">     261</span> <span class="tlaGNC">           1 :     uint8_t *buf = malloc(SZ);</span></span>
+<span id="L262"><span class="lineNum">     262</span> <span class="tlaGNC">           1 :     if (!buf) { perror(&quot;malloc&quot;); exit(2); }</span></span>
+<span id="L263"><span class="lineNum">     263</span> <span class="tlaGNC">           1 :     unsigned seed = 0xCAFEBABE;</span></span>
+<span id="L264"><span class="lineNum">     264</span> <span class="tlaGNC">           1 :     fill_rand(buf, SZ, &amp;seed);</span></span>
+<span id="L265"><span class="lineNum">     265</span>              : </span>
+<span id="L266"><span class="lineNum">     266</span> <span class="tlaGNC">           1 :     uint32_t one = crc32(buf, SZ);</span></span>
+<span id="L267"><span class="lineNum">     267</span>              : </span>
+<span id="L268"><span class="lineNum">     268</span>              :     // incremental with pseudo-random chunk sizes</span>
+<span id="L269"><span class="lineNum">     269</span> <span class="tlaGNC">           1 :     uint32_t crc = crc32_begin();</span></span>
+<span id="L270"><span class="lineNum">     270</span> <span class="tlaGNC">           1 :     size_t off = 0;</span></span>
+<span id="L271"><span class="lineNum">     271</span> <span class="tlaGNC">           1 :     unsigned seed2 = 0x13579BDF;</span></span>
+<span id="L272"><span class="lineNum">     272</span> <span class="tlaGNC">          32 :     while (off &lt; SZ) {</span></span>
+<span id="L273"><span class="lineNum">     273</span>              :         // chunk between 1 and 65536, bounded by remaining</span>
+<span id="L274"><span class="lineNum">     274</span> <span class="tlaGNC">          31 :         size_t rem = SZ - off;</span></span>
+<span id="L275"><span class="lineNum">     275</span> <span class="tlaGNC">          31 :         size_t chunk = (size_t)((seed2 = (1664525 * seed2 + 1013904223)) % 65536) + 1;</span></span>
+<span id="L276"><span class="lineNum">     276</span> <span class="tlaGNC">          31 :         if (chunk &gt; rem) chunk = rem;</span></span>
+<span id="L277"><span class="lineNum">     277</span> <span class="tlaGNC">          31 :         crc = crc32_update(crc, buf + off, chunk);</span></span>
+<span id="L278"><span class="lineNum">     278</span> <span class="tlaGNC">          31 :         off += chunk;</span></span>
+<span id="L279"><span class="lineNum">     279</span>              :     }</span>
+<span id="L280"><span class="lineNum">     280</span> <span class="tlaGNC">           1 :     crc = crc32_finalize(crc);</span></span>
+<span id="L281"><span class="lineNum">     281</span>              : </span>
+<span id="L282"><span class="lineNum">     282</span> <span class="tlaGNC">           1 :     REPORT(&quot;1MiB buffer one-shot==incremental&quot;, one == crc);</span></span>
+<span id="L283"><span class="lineNum">     283</span>              : </span>
+<span id="L284"><span class="lineNum">     284</span>              :     // Also test calculate_memory_hash wrapper matches one-shot for same data</span>
+<span id="L285"><span class="lineNum">     285</span> <span class="tlaGNC">           1 :     uint32_t mem_hash = calculate_memory_hash(buf, 0, SZ); // note: start_addr param used as offset</span></span>
+<span id="L286"><span class="lineNum">     286</span>              :     // calculate_memory_hash expects (memory, start_addr, length) and returns crc32(memory + start_addr, length)</span>
+<span id="L287"><span class="lineNum">     287</span>              :     // Our buffer is not located at mem+start in VM memory; but function is generic and will work for this local buf if we pass pointer.</span>
+<span id="L288"><span class="lineNum">     288</span>              :     // Because calculate_memory_hash is declared to take (const uint8_t *memory, uint32_t start_addr, size_t length),</span>
+<span id="L289"><span class="lineNum">     289</span>              :     // in our unit test we can call crc32 directly (already checked) — still include one sanity check:</span>
+<span id="L290"><span class="lineNum">     290</span> <span class="tlaGNC">           1 :     REPORT(&quot;1MiB one-shot equals crc32 result (sanity)&quot;, one == crc32(buf, SZ));</span></span>
+<span id="L291"><span class="lineNum">     291</span>              : </span>
+<span id="L292"><span class="lineNum">     292</span> <span class="tlaGNC">           1 :     free(buf);</span></span>
+<span id="L293"><span class="lineNum">     293</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L294"><span class="lineNum">     294</span>              : </span>
+<span id="L295"><span class="lineNum">     295</span>              : /* Additional checks: incremental with zero-length and single-byte edge cases */</span>
+<span id="L296"><span class="lineNum">     296</span> <span class="tlaGNC">           1 : static void test_crc32_edge_cases(void) {</span></span>
+<span id="L297"><span class="lineNum">     297</span> <span class="tlaGNC">           1 :     printf(&quot;=== test_crc32_edge_cases ===\n&quot;);</span></span>
+<span id="L298"><span class="lineNum">     298</span> <span class="tlaGNC">           1 :     uint8_t empty[1] = {0};</span></span>
+<span id="L299"><span class="lineNum">     299</span> <span class="tlaGNC">           1 :     uint32_t c1 = crc32(empty, 0);</span></span>
+<span id="L300"><span class="lineNum">     300</span> <span class="tlaGNC">           1 :     uint32_t c2 = crc32_begin();</span></span>
+<span id="L301"><span class="lineNum">     301</span> <span class="tlaGNC">           1 :     c2 = crc32_update(c2, empty, 0);</span></span>
+<span id="L302"><span class="lineNum">     302</span> <span class="tlaGNC">           1 :     c2 = crc32_finalize(c2);</span></span>
+<span id="L303"><span class="lineNum">     303</span> <span class="tlaGNC">           1 :     REPORT(&quot;crc32 zero-length matches incremental zero-length&quot;, c1 == c2);</span></span>
+<span id="L304"><span class="lineNum">     304</span>              : </span>
+<span id="L305"><span class="lineNum">     305</span> <span class="tlaGNC">           1 :     uint8_t oneb[1] = {0xAB};</span></span>
+<span id="L306"><span class="lineNum">     306</span> <span class="tlaGNC">           1 :     uint32_t o1 = crc32(oneb, 1);</span></span>
+<span id="L307"><span class="lineNum">     307</span> <span class="tlaGNC">           1 :     uint32_t o2 = crc32_begin();</span></span>
+<span id="L308"><span class="lineNum">     308</span> <span class="tlaGNC">           1 :     o2 = crc32_update(o2, oneb, 1);</span></span>
+<span id="L309"><span class="lineNum">     309</span> <span class="tlaGNC">           1 :     o2 = crc32_finalize(o2);</span></span>
+<span id="L310"><span class="lineNum">     310</span> <span class="tlaGNC">           1 :     REPORT(&quot;crc32 single-byte matches incremental single-byte&quot;, o1 == o2);</span></span>
+<span id="L311"><span class="lineNum">     311</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L312"><span class="lineNum">     312</span>              : </span>
+<span id="L313"><span class="lineNum">     313</span>              : /* ---------------------</span>
+<span id="L314"><span class="lineNum">     314</span>              :    run all</span>
+<span id="L315"><span class="lineNum">     315</span>              :    --------------------- */</span>
+<span id="L316"><span class="lineNum">     316</span> <span class="tlaGNC">           1 : int main(void) {</span></span>
+<span id="L317"><span class="lineNum">     317</span> <span class="tlaGNC">           1 :     printf(&quot;=== hashing unit tests ===\n&quot;);</span></span>
+<span id="L318"><span class="lineNum">     318</span> <span class="tlaGNC">           1 :     test_crc32_vectors();</span></span>
+<span id="L319"><span class="lineNum">     319</span> <span class="tlaGNC">           1 :     test_memory_and_register_hash();</span></span>
+<span id="L320"><span class="lineNum">     320</span> <span class="tlaGNC">           1 :     test_hash_table_basic();</span></span>
+<span id="L321"><span class="lineNum">     321</span> <span class="tlaGNC">           1 :     test_collision_and_probing();</span></span>
+<span id="L322"><span class="lineNum">     322</span> <span class="tlaGNC">           1 :     test_string_and_ptr_types();</span></span>
+<span id="L323"><span class="lineNum">     323</span> <span class="tlaGNC">           1 :     test_smc_scenario();</span></span>
+<span id="L324"><span class="lineNum">     324</span>              : </span>
+<span id="L325"><span class="lineNum">     325</span> <span class="tlaGNC">           1 :     printf(&quot;=== hashing random/incremental tests ===\n&quot;);</span></span>
+<span id="L326"><span class="lineNum">     326</span>              :     // srand for chunk size randomness used above (not data)</span>
+<span id="L327"><span class="lineNum">     327</span> <span class="tlaGNC">           1 :     srand(42);</span></span>
+<span id="L328"><span class="lineNum">     328</span>              : </span>
+<span id="L329"><span class="lineNum">     329</span> <span class="tlaGNC">           1 :     test_crc32_random_buffers();</span></span>
+<span id="L330"><span class="lineNum">     330</span> <span class="tlaGNC">           1 :     test_crc32_1MiB_incremental();</span></span>
+<span id="L331"><span class="lineNum">     331</span> <span class="tlaGNC">           1 :     test_crc32_edge_cases();</span></span>
+<span id="L332"><span class="lineNum">     332</span>              : </span>
+<span id="L333"><span class="lineNum">     333</span>              : </span>
+<span id="L334"><span class="lineNum">     334</span> <span class="tlaGNC">           1 :     printf(&quot;=========================================\n&quot;);</span></span>
+<span id="L335"><span class="lineNum">     335</span> <span class="tlaGNC">           1 :     if (fails == 0) {</span></span>
+<span id="L336"><span class="lineNum">     336</span> <span class="tlaGNC">           1 :         printf(&quot;ALL TESTS PASSED (%d)\n&quot;, tests);</span></span>
+<span id="L337"><span class="lineNum">     337</span> <span class="tlaGNC">           1 :         return 0;</span></span>
+<span id="L338"><span class="lineNum">     338</span>              :     } else {</span>
+<span id="L339"><span class="lineNum">     339</span> <span class="tlaUNC tlaBgUNC">           0 :         printf(&quot;FAILED: %d / %d\n&quot;, fails, tests);</span></span>
+<span id="L340"><span class="lineNum">     340</span> <span class="tlaUNC">           0 :         return 1;</span></span>
+<span id="L341"><span class="lineNum">     341</span>              :     }</span>
+<span id="L342"><span class="lineNum">     342</span>              : }</span>
+        </pre>
+              </td>
+            </tr>
+          </table>
+          <br>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+            <tr><td class="versionInfo">Generated by: <a href="https://github.com//linux-test-project/lcov" target="_parent">LCOV version 2.0-1</a></td></tr>
+          </table>
+          <br>
+
+</body>
+</html>

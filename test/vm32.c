@@ -1,6 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
 
-#include <unistd.h>   // usleep
 #include "vm32.h"
 #include "funcs.h"
 #include "debug.h"
@@ -15,6 +14,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <unistd.h>   // usleep
 
 /* ----------------------------
    Конфигурация VM

@@ -1,5 +1,5 @@
 ╔═══════════════════════════════════════════════════════════════╗
-║           VM32 Execution Log - Tue Feb  3 12:00:28 2026
+║           VM32 Execution Log - Tue Feb  3 14:13:55 2026
 ╠═══════════════════════════════════════════════════════════════╣
 ║ Memory: 67108864 bytes (64.00 MB)
 ║ Registers: 256
@@ -7,7 +7,7 @@
 ╚═══════════════════════════════════════════════════════════════╝
 
 
-=== CYCLE 1 START (time_ms=6760796) ===
+=== CYCLE 1 START (time_ms=14395804) ===
 Registers hash at start: 0xEFB5AF2E
 Initialized prev_cycle_hash = 0xEFB5AF2E
 
@@ -48,7 +48,7 @@ Initialized prev_cycle_hash = 0xEFB5AF2E
 
 Module test_program_flow: executed 2 instructions
 Registers hash at end: 0xEFB5AF2E
-time_ms at end: 6761796 (delta: 1000 ms)
+time_ms at end: 14396804 (delta: 1000 ms)
 VM elapsed this cycle: 0 ms
 === CYCLE 1 END: 2 instructions in 0 ms ===
 

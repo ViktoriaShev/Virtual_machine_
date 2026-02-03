@@ -26,8 +26,9 @@ endif
 # =========================================================
 # Flags
 # =========================================================
-CFLAGS  := -std=c11 -O2 -Wall -Wextra -Iinclude
-LDFLAGS := -lm -latomic
+CFLAGS  ?= -std=c11 -O2 -Wall -Wextra -Iinclude
+LDFLAGS ?= 
+LDLIBS := -lm -latomic
 
 # =========================================================
 # Directories
@@ -86,7 +87,7 @@ $(BUILD_DIR)/host_converter.o: $(CONVERTER_SRC)
 # VM (target)
 # =========================================================
 $(VM_TARGET): $(VM_OBJS)
-	$(VM_CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(VM_CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)  $(LDLIBS)
 
 $(BUILD_DIR)/vm_$(VM_SUFFIX)_%.o: %.c
 	$(VM_CC) $(CFLAGS) -c $< -o $@
@@ -142,42 +143,42 @@ TEST_TARGET := testing/test_timers
 # build the timers unit test
 $(TEST_TARGET): testing/test_timers.c timers.c | dirs
 	@mkdir -p testing
-	$(TEST_CC) $(TEST_CFLAGS) -Iinclude -o $@ $^ $(LDFLAGS)
+	$(TEST_CC) $(TEST_CFLAGS) -Iinclude -o $@ $^ $(LDLIBS)
 
 test-timers: $(TEST_TARGET)
 
 test-decode: dirs
-	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_decode testing/test_decode.c $(VM_SRCS) $(LDFLAGS)
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_decode testing/test_decode.c $(VM_SRCS) $(LDLIBS)
 	./testing/test_decode
 
 # hashing unit test: compile only hashing.c + helper header
 test-hashing: dirs
-	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_hashing testing/test_hashing.c hashing.c $(LDFLAGS)
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_hashing testing/test_hashing.c hashing.c $(LDLIBS)
 	./testing/test_hashing
 
 # funcs_alu unit test: compile funcs.c + vm32.c (for reg[], etc.)
 test-funcs-alu:
-	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_alu testing/test_funcs_alu.c $(VM_SRCS) $(LDFLAGS)
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_alu testing/test_funcs_alu.c $(VM_SRCS) $(LDLIBS)
 	./testing/test_funcs_alu
 
 test-funcs-jmp: dirs
-	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_jmp testing/test_funcs_jmp.c $(VM_SRCS) $(LDFLAGS)
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_jmp testing/test_funcs_jmp.c $(VM_SRCS) $(LDLIBS)
 	./testing/test_funcs_jmp
 
 test-labels: dirs
-	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_labels testing/test_labels.c $(VM_SRCS) $(LDFLAGS)
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_labels testing/test_labels.c $(VM_SRCS) $(LDLIBS)
 	./testing/test_labels
 
 test-funcs-string: dirs
-	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_string testing/test_funcs_string.c $(VM_SRCS) $(LDFLAGS)
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_string testing/test_funcs_string.c $(VM_SRCS) $(LDLIBS)
 	./testing/test_funcs_string
 
 test-funcs-counters: dirs
-	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_counters testing/test_funcs_counters.c $(VM_SRCS) $(LDFLAGS)
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_counters testing/test_funcs_counters.c $(VM_SRCS) $(LDLIBS)
 	./testing/test_funcs_counters
 
 test-program-flow: dirs
-	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_program_flow testing/test_program_flow.c $(VM_SRCS) $(LDFLAGS)
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_program_flow testing/test_program_flow.c $(VM_SRCS) $(LDLIBS)
 	./testing/test_program_flow
 
 # run all tests (add more dependencies here later)
