@@ -172,8 +172,16 @@ test-funcs-string: dirs
 	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_string testing/test_funcs_string.c $(VM_SRCS) $(LDFLAGS)
 	./testing/test_funcs_string
 
+test-funcs-counters: dirs
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_funcs_counters testing/test_funcs_counters.c $(VM_SRCS) $(LDFLAGS)
+	./testing/test_funcs_counters
+
+test-program-flow: dirs
+	$(VM_CC) $(CFLAGS) -DUNIT_TEST -Iinclude -o testing/test_program_flow testing/test_program_flow.c $(VM_SRCS) $(LDFLAGS)
+	./testing/test_program_flow
+
 # run all tests (add more dependencies here later)
-test: test-timers test-decode test-hashing test-funcs-alu test-funcs-jmp test-labels test-funcs-string
+test: test-timers test-decode test-hashing test-funcs-alu test-funcs-jmp test-labels test-funcs-counters test-program-flow test-funcs-string
 	@echo "Running timers unit tests..."
 	./$(TEST_TARGET)
 

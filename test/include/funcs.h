@@ -49,6 +49,10 @@ typedef struct {
     uint32_t preset;
 } CT_Counter;
 
+#ifdef UNIT_TEST
+void vm_counters_reset(void);
+#endif
+
 /* Формат инструкции: [ opcode:7 ][ A:8 ][ B:8 ][ IMM:1 ][ C:8 ] */
 #define OPC(i)  (uint8_t)(((i) >> 25) & 0x7F)
 #define RA(i)   (uint8_t)(((i) >> 17) & 0xFF)

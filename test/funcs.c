@@ -402,6 +402,26 @@ static bool ctd_prev_input[MAX_TIMERS] = {0};
 static bool ctud_prev_up[MAX_TIMERS] = {0};
 static bool ctud_prev_down[MAX_TIMERS] = {0};
 
+#ifdef UNIT_TEST
+/* Reset counters and prev-edge flags for unit tests */
+void vm_counters_reset(void) {
+    for (int i = 0; i < 16; ++i) {
+        ctu_counters[i].value = 0;
+        ctu_counters[i].preset = 0;
+        ctd_counters[i].value = 0;
+        ctd_counters[i].preset = 0;
+        ctud_counters[i].value = 0;
+        ctud_counters[i].preset = 0;
+    }
+    /* prev flags are static in this translation unit so we can reset them here */
+    for (int i = 0; i < MAX_TIMERS; ++i) {
+        ctu_prev_input[i] = false;
+        ctd_prev_input[i] = false;
+        ctud_prev_up[i] = false;
+        ctud_prev_down[i] = false;
+    }
+}
+#endif /* UNIT_TEST */
 
 void op_ctu(uint32_t i) {
     int id = (int)reg[RA(i)];
