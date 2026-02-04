@@ -40,7 +40,7 @@ BIN_DIR   := $(BUILD_DIR)/bin
 # =========================================================
 # Sources
 # =========================================================
-VM_SRCS := vm32.c funcs.c debug.c hashing.c timers.c cleanup.c
+VM_SRCS := vm32.c vm_tables.c loader.c funcs.c debug.c hashing.c timers.c cleanup.c
 
 # Host tool (assembler / converter)
 CONVERTER_SRC := converter.c
