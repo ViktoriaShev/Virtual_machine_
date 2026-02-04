@@ -16,11 +16,13 @@ extern FILE *log_file;
 // Функции вывода
 
 // Функции логирования
-void init_logging();
-void log_instruction(uint32_t pc, uint32_t instr);
-void log_before(uint32_t pc, uint32_t instr);
-void log_after(uint32_t pc);
-void close_logging();
+void init_logging(vm_state_t *vm);
+void close_logging(vm_state_t *vm);
+void log_before(vm_state_t *vm, uint32_t pc, uint32_t instr);
+void log_after(vm_state_t *vm, uint32_t pc);
+void log_instruction(vm_state_t *vm, uint32_t pc, uint32_t instr);
+const char* opcode_name(uint8_t opcode);
+
 
 // Декодирование опкодов для отладки
 const char* opcode_name(uint8_t opcode);

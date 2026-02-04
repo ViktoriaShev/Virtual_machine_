@@ -80,7 +80,7 @@ typedef struct {
     /* Функции для работы с типами */
     const key_type_t *key_type;
     const value_type_t *value_type;
-} hash_table_t;
+} hash_table;
 
 /* ----------------------------
    Основные операции (API из Главы 5)

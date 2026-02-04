@@ -7,7 +7,7 @@
 #include "hashing.h"
 #include "cleanup.h"
 #include "timers.h"
-#include "vm_tables.h"   // теперь таблицы вынесены сюда
+#include "vm_tables.h"
 #include "loader.h"
 
 #include <stdio.h>
@@ -19,45 +19,16 @@
 #include <unistd.h>   // usleep
 
 /* ----------------------------
-   Конфигурация VM
+   Константы
    ---------------------------- */
-vm_config_t vm_config = {
-    .clock_rate_hz = 100,
-    .cycle_time_ms = 1000,
-    .enable_cycle_check = true,
-    .enable_hash_check = true,
-    .enable_tick_timing = false,
-    .hash_algo = HASH_CRC32
-};
+#define MAX_INSTRUCTIONS 100000
+#define DEFAULT_PC_START 0x3000
 
 /* ----------------------------
-   Глобальные переменные VM
-   (определения — внешний интерфейс в vm32.h)
+   Локальная таблица опкодов (шаблон)
+   При создании vm эта таблица копируется в vm->op_ex.
    ---------------------------- */
-uint32_t PC_START = 0x3000;
-#define MAX_INSTRUCTIONS 100000
-
-uint32_t PC = 0;
-uint8_t *mem = NULL;
-uint32_t reg[REG_COUNT] = {0};
-bool running = true;
-uint64_t time_ms = 0;
-static uint64_t instr_ns_accum = 0;
-
-/* Program integrity */
-uint32_t program_hash = 0;
-size_t program_size = 0;
-
-struct timespec last_tick_time = {0, 0};
-uint32_t cycle_count = 0;
-uint32_t prev_cycle_hash = 0;
-
-/* Модули (список загруженных бинарников) */
-module_info_t *modules = NULL;
-size_t module_count = 0;
-
-/* Таблица опкодов — остаётся в vm32.c (вызываемые функции в funcs.c) */
-op_ex_f op_ex[OPCODE_COUNT] = {
+static op_ex_f default_op_ex[OPCODE_COUNT] = {
     op_add, op_sub, op_mul, op_div, op_mod, op_expt, op_abs, op_sqrt, op_ln, op_log,
     op_exp, op_sin, op_cos, op_tan, op_asin, op_acos, op_atan,
     op_and, op_or, op_xor, op_not,
@@ -72,30 +43,153 @@ op_ex_f op_ex[OPCODE_COUNT] = {
     op_exit,
     op_halt,
     op_nop,
+    /* остальное — NULL (по умолчанию) */
 };
 
 /* ----------------------------
-   Вспомогательные функции времени
+   Глобальная переменная для сигналов
+   (если CLI запустил только один активный vm — handler ставит флаг stop_requested)
    ---------------------------- */
-void init_timer(void) {
-    clock_gettime(CLOCK_MONOTONIC, &last_tick_time);
+static vm_state_t *g_active_vm_for_signal = NULL;
+
+static void handle_sigterm_global(int sig) {
+    (void)sig;
+    if (g_active_vm_for_signal) {
+        atomic_store(&g_active_vm_for_signal->stop_requested, true);
+    }
 }
 
-long get_elapsed_ms(struct timespec start, struct timespec end) {
+/* ----------------------------
+   Жизненный цикл vm
+   ---------------------------- */
+vm_state_t *vm_create(void) {
+    vm_state_t *vm = (vm_state_t *)calloc(1, sizeof(vm_state_t));
+    if (!vm) return NULL;
+
+    /* выделяем память VM */
+    vm->mem = (uint8_t *)calloc(1, VM_MEM_BYTES);
+    if (!vm->mem) {
+        free(vm);
+        return NULL;
+    }
+
+    /* sensible defaults */
+    vm->PC_START = DEFAULT_PC_START;
+    vm->PC = 0;
+    vm->running = true;
+    atomic_init(&vm->stop_requested, false);
+    vm->time_ms = 0;
+    vm->instr_ns_accum = 0;
+    vm->program_hash = 0;
+    vm->program_size = 0;
+    vm->modules = NULL;
+    vm->module_count = 0;
+    vm->log_file = NULL;
+    vm->logging_enabled = false;
+    vm->user_data = NULL;
+
+    /* defaults for config (same as раньше) */
+    vm->config.clock_rate_hz = 100;
+    vm->config.cycle_time_ms = 1000;
+    vm->config.enable_cycle_check = true;
+    vm->config.enable_hash_check = true;
+    vm->config.enable_tick_timing = false;
+    vm->config.hash_algo = HASH_CRC32;
+
+    /* заполняем таблицу опкодов (копируем) */
+    for (size_t i = 0; i < OPCODE_COUNT; ++i) {
+        vm->op_ex[i] = (i < (sizeof(default_op_ex)/sizeof(default_op_ex[0])) ? default_op_ex[i] : NULL);
+    }
+
+    /* инициализация регистров */
+    for (size_t i = 0; i < REG_COUNT; ++i) vm->reg[i] = 0;
+    /* старое поведение: reg[0]=5, reg[1]=3 */
+    vm->reg[0] = 5;
+    vm->reg[1] = 3;
+
+    /* время */
+    clock_gettime(CLOCK_MONOTONIC, &vm->last_tick_time);
+
+    return vm;
+}
+
+void vm_destroy(vm_state_t *vm) {
+    if (!vm) return;
+
+    if (vm->modules) {
+        for (size_t i = 0; i < vm->module_count; ++i) {
+            free(vm->modules[i].name);
+        }
+        free(vm->modules);
+        vm->modules = NULL;
+    }
+
+    if (vm->mem) {
+        free(vm->mem);
+        vm->mem = NULL;
+    }
+
+    /* если лог-файл открыт глобально, закрываем (если вы хотите per-vm logs,
+       убедитесь, что debug/ logging использует vm->log_file) */
+    if (vm->log_file) {
+        fclose(vm->log_file);
+        vm->log_file = NULL;
+    }
+
+    free(vm);
+}
+
+/* Можно вызывать для (пере)установки sane defaults без пересоздания структуры */
+int vm_init_defaults(vm_state_t *vm) {
+    if (!vm) return -1;
+    vm->config.clock_rate_hz = 100;
+    vm->config.cycle_time_ms = 1000;
+    vm->config.enable_cycle_check = true;
+    vm->config.enable_hash_check = true;
+    vm->config.enable_tick_timing = false;
+    vm->config.hash_algo = HASH_CRC32;
+
+    vm->PC_START = DEFAULT_PC_START;
+    vm->program_hash = 0;
+    vm->program_size = 0;
+    vm->cycle_count = 0;
+    vm->prev_cycle_hash = 0;
+    atomic_store(&vm->stop_requested, false);
+    vm->running = true;
+    vm->time_ms = 0;
+    vm->instr_ns_accum = 0;
+
+    for (size_t i = 0; i < REG_COUNT; ++i) vm->reg[i] = 0;
+    vm->reg[0] = 5;
+    vm->reg[1] = 3;
+
+    return 0;
+}
+
+/* ----------------------------
+   Вспомогательные функции времени — инстансные
+   ---------------------------- */
+void vm_init_timer(vm_state_t *vm) {
+    if (!vm) return;
+    clock_gettime(CLOCK_MONOTONIC, &vm->last_tick_time);
+}
+
+long vm_get_elapsed_ms(struct timespec start, struct timespec end) {
     return (end.tv_sec - start.tv_sec) * 1000 +
            (end.tv_nsec - start.tv_nsec) / 1000000;
 }
 
-void wait_for_tick(void) {
-    if (!vm_config.enable_tick_timing || vm_config.clock_rate_hz == 0) {
+void vm_wait_for_tick(vm_state_t *vm) {
+    if (!vm) return;
+    if (!vm->config.enable_tick_timing || vm->config.clock_rate_hz == 0) {
         return;
     }
     struct timespec current_time;
     clock_gettime(CLOCK_MONOTONIC, &current_time);
 
-    long interval_ns = 1000000000 / vm_config.clock_rate_hz;
-    long elapsed_ns = (current_time.tv_sec - last_tick_time.tv_sec) * 1000000000 +
-                      (current_time.tv_nsec - last_tick_time.tv_nsec);
+    long interval_ns = 1000000000 / vm->config.clock_rate_hz;
+    long elapsed_ns = (current_time.tv_sec - vm->last_tick_time.tv_sec) * 1000000000 +
+                      (current_time.tv_nsec - vm->last_tick_time.tv_nsec);
 
     if (elapsed_ns < interval_ns) {
         long remaining_ns = interval_ns - elapsed_ns;
@@ -103,147 +197,141 @@ void wait_for_tick(void) {
         nanosleep(&sleep_time, NULL);
     }
 
-    clock_gettime(CLOCK_MONOTONIC, &last_tick_time);
+    clock_gettime(CLOCK_MONOTONIC, &vm->last_tick_time);
 }
 
 /* ----------------------------
-   PC stack helpers
+   Основной цикл выполнения — инстансный
    ---------------------------- */
-#define PC_STACK_SIZE 256
-uint32_t pc_stack[PC_STACK_SIZE];
-uint32_t pc_stack_ptr = 0;
+int run_program(vm_state_t *vm) {
+    if (!vm) return -1;
 
-static inline void push_pc(uint32_t pc) {
-    if (pc_stack_ptr < PC_STACK_SIZE) pc_stack[pc_stack_ptr++] = pc;
-}
-
-static inline uint32_t pop_pc(void) {
-    if (pc_stack_ptr == 0) return 0;
-    return pc_stack[--pc_stack_ptr];
-}
-
-void handle_sigterm(int sig) {
-    (void)sig;
-    atomic_store(&vm_stop_requested, true);
-}
-
-/* ----------------------------
-   Основной цикл выполнения
-   (не трогаем логику — она остаётся прежней, но зависимости вынесены)
-   ---------------------------- */
-void run_program(void) {
     struct timespec cycle_start, cycle_end;
 
-    init_timer();
-    init_logging();
+    vm_init_timer(vm);
+
+    /* Инициализация логгирования (функция из debug.h) — оставляем вызов,
+       предполагая, что debug/init logging можно адаптировать к per-vm позже. */
+    init_logging(vm);
 
     struct timespec __now;
     clock_gettime(CLOCK_MONOTONIC, &__now);
-    time_ms = (uint64_t)__now.tv_sec * 1000ULL + (uint64_t)(__now.tv_nsec / 1000000ULL);
+    vm->time_ms = (uint64_t)__now.tv_sec * 1000ULL + (uint64_t)(__now.tv_nsec / 1000000ULL);
 
-    vm_config.hash_algo = HASH_CRC32;
-    vm_config.enable_hash_check = true;
+    /* Принудительные значения (как раньше) */
+    vm->config.hash_algo = HASH_CRC32;
+    vm->config.enable_hash_check = true;
 
     printf("Starting VM execution with cycle-based execution\n");
-    printf("Cycle time: %u ms\n", vm_config.cycle_time_ms);
-    printf("Hash check: %s\n", vm_config.enable_hash_check ? "enabled" : "disabled");
-    printf("Cycle overrun check: %s\n", vm_config.enable_cycle_check ? "enabled" : "disabled");
-    printf("Tick timing: %s\n", vm_config.enable_tick_timing ? "enabled" : "disabled");
-    printf("Clock rate: %u Hz\n", vm_config.clock_rate_hz);
+    printf("Cycle time: %u ms\n", vm->config.cycle_time_ms);
+    printf("Hash check: %s\n", vm->config.enable_hash_check ? "enabled" : "disabled");
+    printf("Cycle overrun check: %s\n", vm->config.enable_cycle_check ? "enabled" : "disabled");
+    printf("Tick timing: %s\n", vm->config.enable_tick_timing ? "enabled" : "disabled");
+    printf("Clock rate: %u Hz\n", vm->config.clock_rate_hz);
     printf("\n");
 
+    /* локальный PC-stack (пер-вызовный, не делаем полем vm, можно вынести при необходимости) */
+        /* локальный PC-stack (пер-вызовный) */
+    uint32_t pc_stack[256];
+    uint32_t pc_stack_ptr = 0;
+    /* Если понадобятся push/pop, используйте прямые операции с pc_stack и pc_stack_ptr:
+         if (pc_stack_ptr < sizeof(pc_stack)/sizeof(pc_stack[0])) pc_stack[pc_stack_ptr++] = value;
+         if (pc_stack_ptr > 0) { uint32_t v = pc_stack[--pc_stack_ptr]; ... }
+       Сейчас push/pop не используются в этом цикле, поэтому никаких вспомогательных функций не требуется. */
+
+
     while (1) {
-        cycle_count++;
+        vm->cycle_count++;
         clock_gettime(CLOCK_MONOTONIC, &cycle_start);
-        if (atomic_load(&vm_stop_requested)) {
+        if (atomic_load(&vm->stop_requested)) {
             run_cleanups();
             break;
         }
-        uint64_t cycle_start_ms = time_ms;
+        uint64_t cycle_start_ms = vm->time_ms;
         if (logging_enabled && log_file) {
-            fprintf(log_file, "\n=== CYCLE %u START (time_ms=%llu) ===\n", cycle_count, (unsigned long long)time_ms);
+            fprintf(log_file, "\n=== CYCLE %u START (time_ms=%llu) ===\n", vm->cycle_count, (unsigned long long)vm->time_ms);
         }
 
-        uint32_t start_hash = calculate_registers_hash(reg, REG_COUNT);
+        uint32_t start_hash = calculate_registers_hash(vm->reg, REG_COUNT);
         if (logging_enabled && log_file) {
             fprintf(log_file, "Registers hash at start: 0x%08X\n", start_hash);
         }
 
-        if (vm_config.enable_hash_check && cycle_count == 1) {
-            prev_cycle_hash = start_hash;
+        if (vm->config.enable_hash_check && vm->cycle_count == 1) {
+            vm->prev_cycle_hash = start_hash;
             if (logging_enabled && log_file) {
-                fprintf(log_file, "Initialized prev_cycle_hash = 0x%08X\n", prev_cycle_hash);
+                fprintf(log_file, "Initialized prev_cycle_hash = 0x%08X\n", vm->prev_cycle_hash);
             }
         }
 
         uint64_t total_instr_count = 0;
 
-        for (size_t mod_idx = 0; mod_idx < module_count; ++mod_idx) {
-            module_info_t *mod = &modules[mod_idx];
+        for (size_t mod_idx = 0; mod_idx < vm->module_count; ++mod_idx) {
+            module_info_t *mod = &vm->modules[mod_idx];
 
             if (logging_enabled && log_file) {
                 fprintf(log_file, "\n--- Executing module: %s (0x%X) ---\n", mod->name, mod->addr);
             }
 
-            running = true;
-            PC = mod->addr;
+            vm->running = true;
+            vm->PC = mod->addr;
             pc_stack_ptr = 0;
 
             uint64_t instr_count = 0;
             uint32_t module_end = mod->addr + mod->size;
 
-            while (running && instr_count < MAX_INSTRUCTIONS) {
-                if (PC >= module_end || PC < mod->addr) {
+            while (vm->running && instr_count < MAX_INSTRUCTIONS) {
+                if (vm->PC >= module_end || vm->PC < mod->addr) {
                     if (logging_enabled && log_file) {
-                        fprintf(log_file, "INFO: Module %s completed (PC=0x%X)\n", mod->name, PC);
+                        fprintf(log_file, "INFO: Module %s completed (PC=0x%X)\n", mod->name, vm->PC);
                     }
                     break;
                 }
 
-                uint32_t instr = mr32(PC);
+                uint32_t instr = vm_mr32(vm, vm->PC);
                 if (instr == 0) {
                     if (logging_enabled && log_file) {
-                        fprintf(log_file, "INFO: End of module %s at PC=0x%X\n", mod->name, PC);
+                        fprintf(log_file, "INFO: End of module %s at PC=0x%X\n", mod->name, vm->PC);
                     }
                     break;
                 }
 
-                decoded_instr_t *d = vm_decode_instruction(PC);
+                decoded_instr_t *d = vm_decode_instruction(vm, vm->PC);
                 if (!d) {
                     printf("Cycle %u, Module %s: Failed to decode at PC=0x%X\n",
-                           cycle_count, mod->name, PC);
-                    running = false;
+                           vm->cycle_count, mod->name, vm->PC);
+                    vm->running = false;
                     break;
                 }
 
                 uint8_t opcode = OPC(instr);
-                if (opcode >= OPCODE_COUNT || op_ex[opcode] == NULL) {
+                if (opcode >= OPCODE_COUNT || vm->op_ex[opcode] == NULL) {
                     printf("Cycle %u, Module %s: Invalid opcode %u at PC=0x%X\n",
-                           cycle_count, mod->name, opcode, PC);
-                    running = false;
+                           vm->cycle_count, mod->name, opcode, vm->PC);
+                    vm->running = false;
                     break;
                 }
 
-                uint32_t old_pc = PC;
-                log_before(PC, instr);
-                op_ex[opcode](d->raw_instr);
-                if (PC == old_pc) PC += 4;
-                log_after(PC);
+                uint32_t old_pc = vm->PC;
+                log_before(vm,vm->PC, instr);
+                vm->op_ex[opcode](vm, d->raw_instr);
+                if (vm->PC == old_pc) vm->PC += 4;
+                log_after(vm,vm->PC);
 
                 instr_count++;
-                wait_for_tick();
+                vm_wait_for_tick(vm);
 
-                if (vm_config.enable_tick_timing && vm_config.clock_rate_hz != 0) {
+                if (vm->config.enable_tick_timing && vm->config.clock_rate_hz != 0) {
                     struct timespec __now;
                     clock_gettime(CLOCK_MONOTONIC, &__now);
-                    time_ms = (uint64_t)__now.tv_sec * 1000ULL + (uint64_t)(__now.tv_nsec / 1000000ULL);
-                } else if (vm_config.clock_rate_hz != 0) {
-                    uint64_t instr_ns = 1000000000ULL / (uint64_t)vm_config.clock_rate_hz;
-                    instr_ns_accum += instr_ns;
-                    uint64_t add_ms = instr_ns_accum / 1000000ULL;
+                    vm->time_ms = (uint64_t)__now.tv_sec * 1000ULL + (uint64_t)(__now.tv_nsec / 1000000ULL);
+                } else if (vm->config.clock_rate_hz != 0) {
+                    uint64_t instr_ns = 1000000000ULL / (uint64_t)vm->config.clock_rate_hz;
+                    vm->instr_ns_accum += instr_ns;
+                    uint64_t add_ms = vm->instr_ns_accum / 1000000ULL;
                     if (add_ms) {
-                        time_ms += add_ms;
-                        instr_ns_accum -= add_ms * 1000000ULL;
+                        vm->time_ms += add_ms;
+                        vm->instr_ns_accum -= add_ms * 1000000ULL;
                     }
                 }
             }
@@ -257,66 +345,66 @@ void run_program(void) {
         }
 
         /* Завершение цикла: гарантируем минимум cycle_time_ms (если не tick_timing) */
-        if (!vm_config.enable_tick_timing) {
-            uint64_t expected_end = cycle_start_ms + (uint64_t)vm_config.cycle_time_ms;
-            if (time_ms < expected_end) time_ms = expected_end;
+        if (!vm->config.enable_tick_timing) {
+            uint64_t expected_end = cycle_start_ms + (uint64_t)vm->config.cycle_time_ms;
+            if (vm->time_ms < expected_end) vm->time_ms = expected_end;
         }
 
-        update_all_timers();
+        update_all_timers(vm); /* предполагается адаптировать под per-vm, при необходимости заменить на update_all_timers(vm) */
 
-        uint32_t end_hash = calculate_registers_hash(reg, REG_COUNT);
+        uint32_t end_hash = calculate_registers_hash(vm->reg, REG_COUNT);
 
-        if (vm_config.enable_hash_check) {
-            if (cycle_count > 1 && end_hash != prev_cycle_hash) {
-                fprintf(log_file, "!!! HASH MISMATCH: Previous 0x%08X, current 0x%08X\n",
-                        prev_cycle_hash, end_hash);
-                printf("!!! HASH MISMATCH detected on cycle %u\n", cycle_count);
+        if (vm->config.enable_hash_check) {
+            if (vm->cycle_count > 1 && end_hash != vm->prev_cycle_hash) {
+                if (log_file) fprintf(log_file, "!!! HASH MISMATCH: Previous 0x%08X, current 0x%08X\n",
+                                     vm->prev_cycle_hash, end_hash);
+                printf("!!! HASH MISMATCH detected on cycle %u\n", vm->cycle_count);
             }
-            uint32_t cur_prog_hash = calculate_memory_hash(mem, PC_START, program_size);
-            if (cur_prog_hash != program_hash) {
-                fprintf(log_file, "!!! PROGRAM MEMORY HASH MISMATCH\n");
-                printf("!!! PROGRAM MEMORY HASH MISMATCH on cycle %u\n", cycle_count);
+            uint32_t cur_prog_hash = calculate_memory_hash(vm->mem, vm->PC_START, vm->program_size);
+            if (cur_prog_hash != vm->program_hash) {
+                if (log_file) fprintf(log_file, "!!! PROGRAM MEMORY HASH MISMATCH\n");
+                printf("!!! PROGRAM MEMORY HASH MISMATCH on cycle %u\n", vm->cycle_count);
             }
         }
-        prev_cycle_hash = end_hash;
+        vm->prev_cycle_hash = end_hash;
 
         if (logging_enabled && log_file) {
             fprintf(log_file, "Registers hash at end: 0x%08X\n", end_hash);
             fprintf(log_file, "time_ms at end: %llu (delta: %llu ms)\n",
-                    (unsigned long long)time_ms,
-                    (unsigned long long)(time_ms - cycle_start_ms));
+                    (unsigned long long)vm->time_ms,
+                    (unsigned long long)(vm->time_ms - cycle_start_ms));
         }
 
         clock_gettime(CLOCK_MONOTONIC, &cycle_end);
-        long elapsed_ms = get_elapsed_ms(cycle_start, cycle_end);
-        long remaining_ms = vm_config.cycle_time_ms - elapsed_ms;
+        long elapsed_ms = vm_get_elapsed_ms(cycle_start, cycle_end);
+        long remaining_ms = vm->config.cycle_time_ms - elapsed_ms;
 
         if (logging_enabled && log_file) {
             fprintf(log_file, "VM elapsed this cycle: %ld ms\n", elapsed_ms);
             fprintf(log_file, "=== CYCLE %u END: %lu instructions in %ld ms ===\n",
-                    cycle_count, (unsigned long)total_instr_count, elapsed_ms);
+                    vm->cycle_count, (unsigned long)total_instr_count, elapsed_ms);
         }
 
         printf("Cycle %u: %lu instructions, %ld ms elapsed, time_ms=%llu\n",
-               cycle_count, (unsigned long)total_instr_count, elapsed_ms,
-               (unsigned long long)time_ms);
+               vm->cycle_count, (unsigned long)total_instr_count, elapsed_ms,
+               (unsigned long long)vm->time_ms);
 
         if (remaining_ms > 0) {
             usleep((useconds_t)(remaining_ms * 1000));
-        } else if (vm_config.enable_cycle_check) {
-            printf("!!! WARNING: Cycle %u overrun by %ld ms\n", cycle_count, -remaining_ms);
+        } else if (vm->config.enable_cycle_check) {
+            printf("!!! WARNING: Cycle %u overrun by %ld ms\n", vm->cycle_count, -remaining_ms);
         }
     }
 
-    close_logging();
+    close_logging(vm);
+    return 0;
 }
 
-
+/* ----------------------------
+   main — CLI (адаптирован)
+   ---------------------------- */
 #ifndef UNIT_TEST
 int main(int argc, char **argv) {
-    signal(SIGINT, handle_sigterm);
-    signal(SIGTERM, handle_sigterm);
-
     if (argc < 2) {
         printf("Usage: %s <program1.bin> [program2.bin ...] [--raw-halt]\n", argv[0]);
         return 1;
@@ -331,7 +419,6 @@ int main(int argc, char **argv) {
     }
 
     int file_count = file_args_end - 1;
-
     if (file_count < 1) {
         fprintf(stderr, "Error: no program files specified\n");
         return 1;
@@ -342,37 +429,38 @@ int main(int argc, char **argv) {
         perror("malloc");
         return 1;
     }
+    for (int i = 0; i < file_count; ++i) filenames[i] = argv[1 + i];
 
-    for (int i = 0; i < file_count; ++i) {
-        filenames[i] = argv[1 + i];
-    }
-
-    mem = (uint8_t*)calloc(1, MEM_BYTES);
-    if (!mem) {
-        printf("Memory allocation failed\n");
+    vm_state_t *vm = vm_create();
+    if (!vm) {
+        fprintf(stderr, "Failed to create VM\n");
         free(filenames);
         return 1;
     }
 
-    for (int i = 0; i < REG_COUNT; i++) reg[i] = 0;
+    /* Установим глобальную переменную для обработчика сигналов (CLI: один активный VM) */
+    g_active_vm_for_signal = vm;
+    signal(SIGINT, handle_sigterm_global);
+    signal(SIGTERM, handle_sigterm_global);
 
-    reg[0] = 5;
-    reg[1] = 3;
+    /* timers / tables — ожидается адаптация реализаций к vm аргументу */
+    timers_init(vm); /* если ваша реализация требует vm, замените на timers_init(vm) */
+    vm_tables_init(vm);
 
-    timers_init();
-    vm_tables_init();
+    if (load_programs(vm, filenames, file_count) != 0) {
+        fprintf(stderr, "Failed to load programs\n");
+        vm_tables_destroy(vm);
+        vm_destroy(vm);
+        free(filenames);
+        return 1;
+    }
 
-    load_programs(filenames, file_count);
+    run_program(vm);
 
-    run_program();
-
-    vm_tables_destroy();
-    free(mem);
+    vm_tables_destroy(vm);
+    vm_destroy(vm);
     free(filenames);
 
-    for (size_t i = 0; i < module_count; ++i) free(modules[i].name);
-    free(modules);
-
-    return vm_exit_code;
+    return 0;
 }
 #endif

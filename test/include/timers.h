@@ -7,41 +7,45 @@
 
 #define MAX_TIMERS 16
 
-/* Общая структура для всех таймеров IEC */
+/* Forward declaration */
+typedef struct vm_state vm_state_t;
+
+/* IEC Timer structure */
 typedef struct {
-    bool enabled;           // Разрешён ли таймер
-    bool input;             // Текущее состояние IN
-    bool prev_input;        // Предыдущее IN (для фронтов)
-    uint32_t preset_ms;     // PT — уставка
-    uint32_t ET;            // Прошедшее время (IEC Elapsed Time)
-    struct timespec start;  // Время старта
-    bool output;            // Q — выход таймера
-    bool timing;            // Фаза "идёт таймер"
+    bool enabled;
+    bool input;
+    bool output;
+    bool prev_input;
+    bool timing;
+    struct timespec start;
+    uint32_t preset_ms;
+    uint32_t ET;  /* Elapsed Time */
 } IEC_Timer;
 
-/* Таймеры для TON/TOF/TP/R */
-extern IEC_Timer ton_timers[MAX_TIMERS];
-extern IEC_Timer tof_timers[MAX_TIMERS];
-extern IEC_Timer tp_timers[MAX_TIMERS];
-extern IEC_Timer tonr_timers[MAX_TIMERS];
-extern IEC_Timer tofr_timers[MAX_TIMERS];
+/* Timer array initialization */
+void timers_init(vm_state_t *vm);
 
-/* Инициализация всех таймеров */
-void timers_init(void);
+/* Update all timers (called each VM cycle) */
+void update_all_timers(vm_state_t *vm);
 
-/* Вызывается раз в цикл VM */
-void update_all_timers(void);
+/* TON - On-Delay Timer */
+void ton_set(vm_state_t *vm, uint8_t id, bool in, uint32_t pt);
+bool ton_Q(vm_state_t *vm, uint8_t id);
 
-/* --- Простые API для инструкций VM --------------------------------- */
-/* Устанавливают вход/pt и включают таймер (и сразу обновляют его),
-   чтобы op_* мог установить вход и тут же прочитать Q. */
-void ton_set(uint8_t id, bool in, uint32_t pt);
-bool ton_Q(uint8_t id);
+/* TOF - Off-Delay Timer */
+void tof_set(vm_state_t *vm, uint8_t id, bool in, uint32_t pt);
+bool tof_Q(vm_state_t *vm, uint8_t id);
 
-void tof_set(uint8_t id, bool in, uint32_t pt);
-bool tof_Q(uint8_t id);
+/* TP - Pulse Timer */
+void tp_set(vm_state_t *vm, uint8_t id, bool in, uint32_t pt);
+bool tp_Q(vm_state_t *vm, uint8_t id);
 
-void tp_set(uint8_t id, bool in, uint32_t pt);
-bool tp_Q(uint8_t id);
+/* TONR - Retentive On-Delay Timer */
+void tonr_set(vm_state_t *vm, uint8_t id, bool in, uint32_t pt);
+bool tonr_Q(vm_state_t *vm, uint8_t id);
 
-#endif
+/* TOFR - Retentive Off-Delay Timer */
+void tofr_set(vm_state_t *vm, uint8_t id, bool in, uint32_t pt);
+bool tofr_Q(vm_state_t *vm, uint8_t id);
+
+#endif /* TIMERS_H */

@@ -10,81 +10,111 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 
-/* локальные таблицы */
-static hash_table_t *labels = NULL;
-static hash_table_t *breakpoints = NULL;
-static hash_table_t *decoded_cache = NULL;
+/*
+  Переписанный под vm_state_t вариант.
+  API:
+    int vm_tables_init(vm_state_t *vm);
+    void vm_tables_destroy(vm_state_t *vm);
+    void labels_add(vm_state_t *vm, const char *name, uint32_t addr);
+    uint32_t *labels_lookup(vm_state_t *vm, const char *name);
+    void bp_set(vm_state_t *vm, uint32_t addr);
+    void bp_clear(vm_state_t *vm, uint32_t addr);
+    bool bp_is_set(vm_state_t *vm, uint32_t addr);
+    decoded_instr_t *vm_decode_instruction(vm_state_t *vm, uint32_t addr);
+*/
 
-/* Инициализация таблиц (labels, breakpoints, decoded cache) */
-void vm_tables_init(void) {
-    /* string_key_type / uint32_key_type / ptr_value_type определены в проекте
-       (раньше вы их использовали прямо из vm32.c) */
-    labels = hash_table_create(&string_key_type, &uint32_value_type);
-    breakpoints = hash_table_create(&uint32_key_type, &uint32_value_type);
-    decoded_cache = hash_table_create(&uint32_key_type, &ptr_value_type);
+int vm_tables_init(vm_state_t *vm) {
+    if (!vm) return -1;
+
+    /* создаём таблицы и сохраняем в vm */
+    vm->labels = hash_table_create(&string_key_type, &uint32_value_type);
+    if (!vm->labels) return -1;
+
+    vm->breakpoints = hash_table_create(&uint32_key_type, &uint32_value_type);
+    if (!vm->breakpoints) {
+        hash_table_destroy(vm->labels);
+        vm->labels = NULL;
+        return -1;
+    }
+
+    vm->decoded_cache = hash_table_create(&uint32_key_type, &ptr_value_type);
+    if (!vm->decoded_cache) {
+        hash_table_destroy(vm->labels);
+        hash_table_destroy(vm->breakpoints);
+        vm->labels = vm->breakpoints = NULL;
+        return -1;
+    }
+
+    return 0;
 }
 
-/* Очистка (освобождает и значения, если value_type.del установлен) */
-void vm_tables_destroy(void) {
-    if (labels) {
-        hash_table_destroy(labels);
-        labels = NULL;
+void vm_tables_destroy(vm_state_t *vm) {
+    if (!vm) return;
+
+    if (vm->labels) {
+        hash_table_destroy(vm->labels);
+        vm->labels = NULL;
     }
-    if (breakpoints) {
-        hash_table_destroy(breakpoints);
-        breakpoints = NULL;
+    if (vm->breakpoints) {
+        hash_table_destroy(vm->breakpoints);
+        vm->breakpoints = NULL;
     }
-    if (decoded_cache) {
-        hash_table_destroy(decoded_cache);
-        decoded_cache = NULL;
+    if (vm->decoded_cache) {
+        /* В value_type для ptr_value_type должен быть установлен делитер,
+           который корректно free() значений (decoded_instr_t*). Если он
+           не установлен в вашей реализации hash_table, нужно вручную
+           итерировать и free() значения здесь — но мы предполагаем, что
+           ptr_value_type обрабатывает это. */
+        hash_table_destroy(vm->decoded_cache);
+        vm->decoded_cache = NULL;
     }
 }
 
 /* labels API */
-void labels_add(const char *name, uint32_t addr) {
-    if (!labels) return;
-    hash_table_insert(labels, name, &addr);
+void labels_add(vm_state_t *vm, const char *name, uint32_t addr) {
+    if (!vm || !vm->labels) return;
+    /* hash_table_insert скопирует ключ/значение согласно типам ключа/значения */
+    hash_table_insert(vm->labels, name, &addr);
 }
 
-uint32_t *labels_lookup(const char *name) {
-    if (!labels) return NULL;
-    return (uint32_t *)hash_table_lookup(labels, name);
+uint32_t *labels_lookup(vm_state_t *vm, const char *name) {
+    if (!vm || !vm->labels) return NULL;
+    return (uint32_t *)hash_table_lookup(vm->labels, name);
 }
 
 /* breakpoints API */
-void bp_set(uint32_t addr) {
-    if (!breakpoints) return;
+void bp_set(vm_state_t *vm, uint32_t addr) {
+    if (!vm || !vm->breakpoints) return;
     uint32_t v = 1;
-    hash_table_insert(breakpoints, &addr, &v);
+    hash_table_insert(vm->breakpoints, &addr, &v);
 }
 
-void bp_clear(uint32_t addr) {
-    if (!breakpoints) return;
-    hash_table_delete(breakpoints, &addr);
+void bp_clear(vm_state_t *vm, uint32_t addr) {
+    if (!vm || !vm->breakpoints) return;
+    hash_table_delete(vm->breakpoints, &addr);
 }
 
-bool bp_is_set(uint32_t addr) {
-    if (!breakpoints) return false;
-    return hash_table_contains(breakpoints, &addr);
+bool bp_is_set(vm_state_t *vm, uint32_t addr) {
+    if (!vm || !vm->breakpoints) return false;
+    return hash_table_contains(vm->breakpoints, &addr);
 }
 
 /* -------------------------
-   Кеш декодированных инструкций
-   -------------------------
-   vm_decode_instruction — возвращает decoded_instr_t* для адреса (кеширует)
-*/
-static decoded_instr_t *decode_instruction_cached(uint32_t addr) {
-    if (!decoded_cache) return NULL;
+   Кеш декодированных инструкций (инстансный)
+   ------------------------- */
+static decoded_instr_t *decode_instruction_cached(vm_state_t *vm, uint32_t addr) {
+    if (!vm || !vm->decoded_cache) return NULL;
 
     uint32_t key = addr;
-    decoded_instr_t *cached = (decoded_instr_t *)hash_table_lookup(decoded_cache, &key);
+    decoded_instr_t *cached = (decoded_instr_t *)hash_table_lookup(vm->decoded_cache, &key);
     if (cached) return cached;
 
-    /* безопасность: проверяем, что можно читать mr32(addr) */
-    if (addr >= MEM_BYTES - 3) return NULL;
+    /* безопасность: проверяем, что можно читать vm_mr32(addr) */
+    if (addr >= VM_MEM_BYTES - 3) return NULL;
 
-    uint32_t instr = mr32(addr);
+    uint32_t instr = vm_mr32(vm, addr);
 
     decoded_instr_t *dec = (decoded_instr_t *)malloc(sizeof(decoded_instr_t));
     if (!dec) {
@@ -100,13 +130,13 @@ static decoded_instr_t *decode_instruction_cached(uint32_t addr) {
     dec->has_immediate = FIMM(instr) ? true : false;
     dec->immediate = dec->has_immediate ? IMM8(instr) : 0;
 
-    /* Вставляем в кеш (hash_table_insert скопирует ключ; value-type для ptr должен free() при destroy) */
-    hash_table_insert(decoded_cache, &key, dec);
+    /* Вставляем в кеш (hash_table_insert скопирует ключ; для value ptr должно быть настроено освобождение) */
+    hash_table_insert(vm->decoded_cache, &key, dec);
 
     return dec;
 }
 
-/* экспортированная обёртка (прототип в vm32.h) */
-decoded_instr_t *vm_decode_instruction(uint32_t addr) {
-    return decode_instruction_cached(addr);
+/* экспортированная обёртка */
+decoded_instr_t *vm_decode_instruction(vm_state_t *vm, uint32_t addr) {
+    return decode_instruction_cached(vm, addr);
 }
