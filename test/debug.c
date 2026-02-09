@@ -1,39 +1,48 @@
 // debug.c
 #define _POSIX_C_SOURCE 200809L
 
+// debug.c (updated)
+// Detailed VM execution logger with correct immediate (FIMM) handling.
+
+#define _POSIX_C_SOURCE 200809L
+
 #include "vm32.h"
-#include "debug.h"   /* if you have debug.h prototypes; ok if not */
-#include "funcs.h"   /* если нужны OPC/RA/RB/RC макросы — но мы используем свои извлечения */
+#include "debug.h"
+#include "funcs.h"
 
 #include <string.h>
 #include <time.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 /* Ensure constants exist */
 #ifndef MEM_LOG_SIZE
 #define MEM_LOG_SIZE 256
 #endif
 
-/* Таблица имен опкодов — можно расширять */
-static const char* opcode_names[OPCODE_COUNT] = {
-    "ADD", "SUB", "MUL", "DIV", "MOD", "EXPT", "ABS", "SQRT", "LN", "LOG",
-    "EXP", "SIN", "COS", "TAN", "ASIN", "ACOS", "ATAN",
-    "AND", "OR", "XOR", "NOT",
-    "EQ", "NE", "GT", "GE", "LT", "LE",
-    "TIME", "DATE", "TOD", "DT", "ADD_TIME", "SUB_TIME",
-    "YEAR", "MONTH", "DAY", "HOUR", "MINUTE", "SECOND",
-    "LEN", "CONCAT", "LEFT", "RIGHT", "MID", "INSERT", "DELETE", "REPLACE",
-    "TON", "TOF", "TP",
-    "CTU", "CTD", "CTUD",
-    "LIMIT", "SEL", "MUX",
-    "JMP", "JMP_IF", "JMP_IF_NOT",
-    "EXIT", "HALT", "NOP"
-    /* остальные позиции остаются NULL/unknown при выходе за пределы */
-};
+/* --- Provide globals (definitions) to satisfy linker and to be used by vm32.c --- */
+bool logging_enabled = false;
+bool verbose_logging = false;
+FILE *log_file = NULL;
 
-/* Небольшие утилиты извлечения полей инструкции (соответствует вашей disassemble) */
+/* Таблица имен опкодов — синхронизировать с OPCODE_COUNT / op table */
+static const char* opcode_names[OPCODE_COUNT] = {
+    "ADD","SUB","MUL","DIV","MOD","EXPT","ABS","SQRT","LN","LOG",
+    "EXP","SIN","COS","TAN","ASIN","ACOS","ATAN",
+    "AND","OR","XOR","NOT",
+    "EQ","NE","GT","GE","LT","LE",
+    "TIME","DATE","TOD","DT","ADD_TIME","SUB_TIME",
+    "YEAR","MONTH","DAY","HOUR","MINUTE","SECOND",
+    "LEN","CONCAT","LEFT","RIGHT","MID","INSERT","DELETE","REPLACE",
+    "TON","TOF","TP",
+    "CTU","CTD","CTUD",
+    "LIMIT","SEL","MUX",
+    "RISING_EDGE","FALLING_EDGE","EDGE_BOTH","RS_LATCH","SR_LATCH","DEMUX",
+    "JMP","JMP_IF","JMP_IF_NOT","EXIT","HALT","NOP"
+};
+/* --- helper utilities: use explicit C-field helpers --- */
 static inline uint8_t instr_opcode(uint32_t instr) {
     return (instr >> 25) & 0x7F;
 }
@@ -43,8 +52,34 @@ static inline uint8_t instr_ra(uint32_t instr) {
 static inline uint8_t instr_rb(uint32_t instr) {
     return (instr >> 9) & 0xFF;
 }
-static inline uint32_t instr_rc(uint32_t instr) {
-    return instr & 0x1FF; /* 9-bit C field, как в оригинальном disassemble */
+/* C-field is 9 bits in encoding: [8]=FIMM, [7:0]=imm/reg */
+static inline uint16_t instr_cfield(uint32_t instr) {
+    return (uint16_t)(instr & 0x1FF);
+}
+static inline int     instr_has_fimm(uint32_t instr) {
+    return ( (instr >> 8) & 1 );
+}
+static inline int8_t  instr_imm8_signed(uint32_t instr) {
+    return (int8_t)(instr & 0xFF); /* sign-extended if cast to int */
+}
+static inline uint8_t instr_c_as_reg_index(uint32_t instr) {
+    return (uint8_t)(instr & 0xFF);
+}
+
+/* ----- fprintf_inst: печатаем #imm если FIMM установлен ----- */
+void fprintf_inst(FILE *f, uint32_t instr) {
+    uint8_t opcode = instr_opcode(instr);
+    uint8_t ra = instr_ra(instr);
+    uint8_t rb = instr_rb(instr);
+
+    if (instr_has_fimm(instr)) {
+        int imm = (int)instr_imm8_signed(instr);
+        fprintf(f, "%-10s R%u, R%u, #%d", opcode_name(opcode), ra, rb, imm);
+    } else {
+        uint8_t rc = instr_c_as_reg_index(instr);
+        fprintf(f, "%-10s R%u, R%u, R%u", opcode_name(opcode), ra, rb, rc);
+    }
+    fprintf(f, "  [0x%08X]", instr);
 }
 
 /* Возвращает имя опкода */
@@ -56,20 +91,11 @@ const char* opcode_name(uint8_t opcode) {
 
 /* Печать 32-bit в двоичном виде (читабельно) */
 void fprintf_binary(FILE *f, uint32_t num) {
+    if (!f) return;
     for (int c = 31; c >= 0; c--) {
         if ((c+1) % 8 == 0 && c != 31) fprintf(f, " ");
-        fprintf(f, "%d", (num >> c) & 1);
+        fprintf(f, "%d", (int)((num >> c) & 1u));
     }
-}
-
-/* Печать инструкции в читабельном виде */
-void fprintf_inst(FILE *f, uint32_t instr) {
-    uint8_t opcode = instr_opcode(instr);
-    uint8_t ra = instr_ra(instr);
-    uint8_t rb = instr_rb(instr);
-    uint32_t rc = instr_rc(instr);
-    fprintf(f, "%-10s R%u, R%u, R%u", opcode_name(opcode), ra, rb, rc);
-    fprintf(f, "  [0x%08X]", instr);
 }
 
 /* dump памяти от from до to (безопасно) */
@@ -111,10 +137,12 @@ void fprintf_mem_nonzero(FILE *f, uint8_t *mem, uint32_t stop) {
 
 /* Печать регистра */
 void fprintf_reg(FILE *f, uint32_t *reg, int idx) {
+    if (!f) return;
     fprintf(f, "R%03d = 0x%08X (%10u)\n", idx, reg[idx], reg[idx]);
 }
 
 void fprintf_reg_all(FILE *f, uint32_t *reg, int size) {
+    if (!f) return;
     fprintf(f, "All registers:\n");
     for (int i = 0; i < size; i++) {
         if (i % 4 == 0) fprintf(f, "  ");
@@ -129,8 +157,8 @@ void init_logging(vm_state_t *vm) {
     if (!vm) return;
     if (!vm->logging_enabled) return;
 
-    /* открываем файл, сохраняем в vm->log_file */
-    vm->log_file = fopen("vm32_log.txt", "w");
+    const char *fname = vm->verbose_logging ? "vm32_log_verbose.txt" : "vm32_log.txt";
+    vm->log_file = fopen(fname, "w");
     if (!vm->log_file) {
         perror("Failed to open log file");
         vm->logging_enabled = false;
@@ -152,7 +180,6 @@ void init_logging(vm_state_t *vm) {
     vm->dbg_instruction_count = 0;
     vm->dbg_prev_pc = vm->PC;
     memcpy(vm->dbg_prev_reg, vm->reg, sizeof(vm->dbg_prev_reg));
-    /* copy first MEM_LOG_SIZE bytes from memory */
     if (VM_MEM_BYTES >= MEM_LOG_SIZE) memcpy(vm->dbg_prev_mem, vm->mem, MEM_LOG_SIZE);
     else memcpy(vm->dbg_prev_mem, vm->mem, VM_MEM_BYTES);
 }
@@ -173,6 +200,8 @@ void log_instruction(vm_state_t *vm, uint32_t pc, uint32_t instr) {
 }
 
 /* Вызывается до исполнения инструкции: сохраняет snapshot и печатает перед-инфо */
+
+/* ----- log_before: print operands carefully and avoid reading vm->reg[rc] when C is immediate ----- */
 void log_before(vm_state_t *vm, uint32_t pc, uint32_t instr) {
     if (!vm || !vm->logging_enabled || !vm->log_file) return;
 
@@ -181,23 +210,47 @@ void log_before(vm_state_t *vm, uint32_t pc, uint32_t instr) {
     if (VM_MEM_BYTES >= MEM_LOG_SIZE) memcpy(vm->dbg_prev_mem, vm->mem, MEM_LOG_SIZE);
     else memcpy(vm->dbg_prev_mem, vm->mem, VM_MEM_BYTES);
 
-    /* детальный или краткий лог */
-    if (!vm->logging_enabled) return; /* just in case */
-
-    /* детальный лог */
+    /* детальный лог инструкции */
     log_instruction(vm, pc, instr);
 
     uint8_t ra = instr_ra(instr);
     uint8_t rb = instr_rb(instr);
-    uint32_t rc = instr_rc(instr);
+    uint8_t rc_idx = instr_c_as_reg_index(instr);
+    int     has_imm = instr_has_fimm(instr);
 
     fprintf(vm->log_file, "│\n");
     fprintf(vm->log_file, "│ Operands BEFORE:\n");
-    fprintf(vm->log_file, "│   R%u (A) = 0x%08X (%10u)\n", ra, vm->reg[ra], vm->reg[ra]);
-    fprintf(vm->log_file, "│   R%u (B) = 0x%08X (%10u)\n", rb, vm->reg[rb], vm->reg[rb]);
-    fprintf(vm->log_file, "│   R%u (C) = 0x%08X (%10u)\n", rc, vm->reg[rc], vm->reg[rc]);
+
+    /* safe read A */
+    if (ra < REG_COUNT) {
+        fprintf(vm->log_file, "│   R%u (A) = 0x%08X (%10u)\n", ra, vm->reg[ra], vm->reg[ra]);
+    } else {
+        fprintf(vm->log_file, "│   R%u (A) = <invalid index>\n", ra);
+    }
+
+    /* safe read B */
+    if (rb < REG_COUNT) {
+        fprintf(vm->log_file, "│   R%u (B) = 0x%08X (%10u)\n", rb, vm->reg[rb], vm->reg[rb]);
+    } else {
+        fprintf(vm->log_file, "│   R%u (B) = <invalid index>\n", rb);
+    }
+
+    /* For C: if immediate -> print signed immediate; else print register value */
+    if (has_imm) {
+        int imm = (int)instr_imm8_signed(instr);
+        /* also show raw low8 for debugging */
+        uint8_t raw = (uint8_t)(instr & 0xFF);
+        fprintf(vm->log_file, "│   C (immediate) = #%d (raw=0x%02X)\n", imm, raw);
+    } else {
+        if (rc_idx < REG_COUNT) {
+            fprintf(vm->log_file, "│   R%u (C) = 0x%08X (%10u)\n", rc_idx, vm->reg[rc_idx], vm->reg[rc_idx]);
+        } else {
+            fprintf(vm->log_file, "│   R%u (C) = <invalid index>\n", rc_idx);
+        }
+    }
     fflush(vm->log_file);
 }
+
 
 /* Вызывается после исполнения инструкции: сравнивает snapshot и пишет изменения */
 void log_after(vm_state_t *vm, uint32_t pc) {

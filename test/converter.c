@@ -195,14 +195,14 @@ int main(int argc, char** argv) {
         char *p = line;
         while (*p && isspace((unsigned char)*p)) p++;
         /* skip empty lines and comments */
-        if (*p == '\0' || *p == '\n' || *p == ';' || *p == '#') continue;
+        if (*p == '\0' || *p == '\n' || *p == ';') continue;
 
         /* remove trailing newline */
         char *nl = strchr(p, '\n'); if (nl) *nl = '\0';
-        /* remove inline comments (start with ';' or '#') */
-        char *cpos = strpbrk(p, ";#");
+        /* remove inline comments (start with ';' only) */
+        char *cpos = strchr(p, ';');
         if (cpos) *cpos = '\0';
-
+    
         /* tokenize */
         char *tok = strtok(p, " \t,");
         if (!tok) continue;

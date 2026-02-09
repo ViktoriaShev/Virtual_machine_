@@ -89,7 +89,10 @@ vm_state_t *vm_create(void) {
     vm->modules = NULL;
     vm->module_count = 0;
     vm->log_file = NULL;
-    vm->logging_enabled = false;
+    vm->logging_enabled = true;
+    vm->verbose_logging = false;
+    vm->log_file = NULL;
+
     vm->user_data = NULL;
 
     /* defaults for config (same as раньше) */
@@ -215,6 +218,11 @@ int vm_init_defaults(vm_state_t *vm) {
         vm->ctud_prev_up[t] = false;
         vm->ctud_prev_down[t] = false;
     }
+
+    vm->logging_enabled = true;
+    vm->verbose_logging = false;
+    vm->log_file = NULL;
+
 
     return 0;
 }

@@ -1,40 +1,48 @@
-Loaded 8 bytes from build/bin/control.bin into memory at 0x00003000
-Loaded 12 bytes from build/bin/io.bin into memory at 0x00003008
-Loaded 12 bytes from build/bin/main.bin into memory at 0x00003014
-Loaded 1284 bytes from build/bin/timer_test.bin into memory at 0x00003020
+Loaded 440 bytes from build/bin/all_funcs.bin into memory at 0x00003000
+Loaded 8 bytes from build/bin/control.bin into memory at 0x000031B8
+Loaded 12 bytes from build/bin/io.bin into memory at 0x000031C0
+Loaded 12 bytes from build/bin/main.bin into memory at 0x000031CC
+Loaded 1280 bytes from build/bin/timer_test.bin into memory at 0x000031D8
 
 === Module Map ===
-Module 0: build/bin/control.bin
+Module 0: build/bin/all_funcs.bin
   Address: 0x00003000
+  Size:    440 bytes
+Module 1: build/bin/control.bin
+  Address: 0x000031B8
   Size:    8 bytes
-Module 1: build/bin/io.bin
-  Address: 0x00003008
+Module 2: build/bin/io.bin
+  Address: 0x000031C0
   Size:    12 bytes
-Module 2: build/bin/main.bin
-  Address: 0x00003014
+Module 3: build/bin/main.bin
+  Address: 0x000031CC
   Size:    12 bytes
-Module 3: build/bin/timer_test.bin
-  Address: 0x00003020
-  Size:    1284 bytes
+Module 4: build/bin/timer_test.bin
+  Address: 0x000031D8
+  Size:    1280 bytes
 ==================
 
-Combined program size: 1316 bytes
-Combined program hash (CRC32): 0x52E5C5B4
-Module 0: build/bin/control.bin at 0x00003000 (8 bytes)
-  [build/bin/control.bin + 0x0000] 0x02060600
-  [build/bin/control.bin + 0x0004] 0x82000000
-Module 1: build/bin/io.bin at 0x00003008 (12 bytes)
-  [build/bin/io.bin + 0x0000] 0x00040400
-  [build/bin/io.bin + 0x0004] 0x04040400
-  [build/bin/io.bin + 0x0008] 0x82000000
-Module 2: build/bin/main.bin at 0x00003014 (12 bytes)
-  [build/bin/main.bin + 0x0000] 0x00000000
-  [build/bin/main.bin + 0x0004] 0x00020200
-  [build/bin/main.bin + 0x0008] 0x82000000
-Module 3: build/bin/timer_test.bin at 0x00003020 (1284 bytes)
+Combined program size: 1752 bytes
+Combined program hash (CRC32): 0xBAAF2378
+Module 0: build/bin/all_funcs.bin at 0x00003000 (440 bytes)
+  [build/bin/all_funcs.bin + 0x0000] 0x02000000
+  [build/bin/all_funcs.bin + 0x0004] 0x0002010A
+  [build/bin/all_funcs.bin + 0x0008] 0x00040103
+Module 1: build/bin/control.bin at 0x000031B8 (8 bytes)
+  [build/bin/control.bin + 0x0000] 0x02060705
+  [build/bin/control.bin + 0x0004] 0x82000100
+Module 2: build/bin/io.bin at 0x000031C0 (12 bytes)
+  [build/bin/io.bin + 0x0000] 0x0004050A
+  [build/bin/io.bin + 0x0004] 0x04040502
+  [build/bin/io.bin + 0x0008] 0x82000100
+Module 3: build/bin/main.bin at 0x000031CC (12 bytes)
+  [build/bin/main.bin + 0x0000] 0x00000101
+  [build/bin/main.bin + 0x0004] 0x00020302
+  [build/bin/main.bin + 0x0008] 0x82000100
+Module 4: build/bin/timer_test.bin at 0x000031D8 (1280 bytes)
   [build/bin/timer_test.bin + 0x0000] 0x02040000
-  [build/bin/timer_test.bin + 0x0004] 0x00280400
-  [build/bin/timer_test.bin + 0x0008] 0x002A0400
+  [build/bin/timer_test.bin + 0x0004] 0x00280502
+  [build/bin/timer_test.bin + 0x0008] 0x002A0503
 Starting VM execution with cycle-based execution
 Cycle time: 1000 ms
 Hash check: enabled
@@ -42,4 +50,4 @@ Cycle overrun check: enabled
 Tick timing: disabled
 Clock rate: 100 Hz
 
-Cycle 1: 326 instructions, 0 ms elapsed, time_ms=7298391
+Cycle 1: 430 instructions, 1 ms elapsed, time_ms=24717916

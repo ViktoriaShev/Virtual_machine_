@@ -129,6 +129,8 @@ typedef struct vm_state {
     /* файлы/логирование (зависит от debug.h) */
     FILE *log_file;
     bool logging_enabled;
+    bool verbose_logging;   /* если нужно особо подробный лог */
+
 
     /* расширяемость: указатель на пользовательские данные (для тестов) */
     void *user_data;
