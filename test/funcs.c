@@ -464,6 +464,140 @@ void op_mux(vm_state_t *vm, uint32_t i) {
     SetA_val(vm, i, vm_mr32(vm, (uint32_t)addr));
 }
 
+/* ===== IEC/SCADA: Edge detectors, latches, demux ===== */
+
+/*
+ * id selection convention:
+ *   if (FIMM(i)) id = IMM8(i)
+ *   else id = (int)vm->reg[RA(i)]
+ *
+ * input signal is read from Bv(vm, i) (boolean: non-zero => true)
+ * outputs are written to register A (SetA_val)
+ */
+
+/* Rising edge: output 1 when input goes 0->1 for the given id */
+void op_rising_edge(vm_state_t *vm, uint32_t i) {
+    int id = -1;
+    if (FIMM(i)) {
+        id = (int)IMM8(i);
+    } else {
+        id = (int)vm->reg[RA(i)];
+    }
+    if (id < 0 || id >= MAX_TIMERS) { SetA_val(vm, i, 0); return; }
+
+    bool in = Bv(vm, i) != 0;
+    bool prev = vm->edge_prev_input[id];
+    bool rising = in && !prev;
+    vm->edge_prev_input[id] = in;
+    SetA_val(vm, i, rising ? 1 : 0);
+}
+
+/* Falling edge: output 1 when input goes 1->0 for the given id */
+void op_falling_edge(vm_state_t *vm, uint32_t i) {
+    int id = -1;
+    if (FIMM(i)) {
+        id = (int)IMM8(i);
+    } else {
+        id = (int)vm->reg[RA(i)];
+    }
+    if (id < 0 || id >= MAX_TIMERS) { SetA_val(vm, i, 0); return; }
+
+    bool in = Bv(vm, i) != 0;
+    bool prev = vm->edge_prev_input[id];
+    bool falling = !in && prev;
+    vm->edge_prev_input[id] = in;
+    SetA_val(vm, i, falling ? 1 : 0);
+}
+
+/* Both edges: output 1 when input changes (either rising or falling) */
+void op_edge_both(vm_state_t *vm, uint32_t i) {
+    int id = -1;
+    if (FIMM(i)) {
+        id = (int)IMM8(i);
+    } else {
+        id = (int)vm->reg[RA(i)];
+    }
+    if (id < 0 || id >= MAX_TIMERS) { SetA_val(vm, i, 0); return; }
+
+    bool in = Bv(vm, i) != 0;
+    bool prev = vm->edge_prev_input[id];
+    bool changed = (in != prev);
+    vm->edge_prev_input[id] = in;
+    SetA_val(vm, i, changed ? 1 : 0);
+}
+
+/*
+ * RS / SR latches
+ *
+ * Calling convention:
+ *   id = FIMM ? IMM8(i) : (int)vm->reg[RA(i)]
+ *   S input = vm->reg[RB(i)] != 0
+ *   R input = vm->reg[RC(i)] != 0
+ *   result written back to vm->reg[RA(i)] (1 or 0)
+ *
+ * Note: this follows common PLC style where RA contains the id and is overwritten
+ * with the Q value (like many other ops in this codebase).
+ */
+
+/* RS latch: Reset has priority (if R==1 => Q=0, else if S==1 => Q=1, else keep) */
+void op_rs_latch(vm_state_t *vm, uint32_t i) {
+    int id = -1;
+    if (FIMM(i)) {
+        id = (int)IMM8(i);
+    } else {
+        id = (int)vm->reg[RA(i)];
+    }
+    if (id < 0 || id >= MAX_TIMERS) { SetA_val(vm, i, 0); return; }
+
+    bool S = vm->reg[RB(i)] != 0;
+    bool R = vm->reg[RC(i)] != 0;
+
+    if (R) {
+        vm->rs_latches[id] = false;
+    } else if (S) {
+        vm->rs_latches[id] = true;
+    }
+    SetA_val(vm, i, vm->rs_latches[id] ? 1 : 0);
+}
+
+/* SR latch: Set has priority (if S==1 => Q=1, else if R==1 => Q=0, else keep) */
+void op_sr_latch(vm_state_t *vm, uint32_t i) {
+    int id = -1;
+    if (FIMM(i)) {
+        id = (int)IMM8(i);
+    } else {
+        id = (int)vm->reg[RA(i)];
+    }
+    if (id < 0 || id >= MAX_TIMERS) { SetA_val(vm, i, 0); return; }
+
+    bool S = vm->reg[RB(i)] != 0;
+    bool R = vm->reg[RC(i)] != 0;
+
+    if (S) {
+        vm->sr_latches[id] = true;
+    } else if (R) {
+        vm->sr_latches[id] = false;
+    }
+    SetA_val(vm, i, vm->sr_latches[id] ? 1 : 0);
+}
+
+/*
+ * Demultiplexer:
+ *   baseAddr = Bv(vm,i)  (memory base address of outputs array)
+ *   idx      = Cv_or_imm(vm,i)  (index to select)
+ *   value    = vm->reg[RA(i)]   (32-bit value to write)
+ *
+ * Writes 32-bit value to baseAddr + idx*4, if in bounds.
+ */
+void op_demux(vm_state_t *vm, uint32_t i) {
+    uint32_t base = Bv(vm, i);
+    uint32_t idx = Cv_or_imm(vm, i);
+    /* compute address as 64-bit to avoid overflow */
+    uint64_t addr = (uint64_t)base + (uint64_t)idx * 4ULL;
+    if (addr + 4 > VM_MEM_BYTES) return;
+    vm_mw32(vm, (uint32_t)addr, vm->reg[RA(i)]);
+}
+
 /* ===== JMP-инструкции ===== */
 
 void op_jmp(vm_state_t *vm, uint32_t i) {

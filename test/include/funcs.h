@@ -143,6 +143,16 @@ void op_limit(vm_state_t *vm, uint32_t i);
 void op_sel(vm_state_t *vm, uint32_t i);
 void op_mux(vm_state_t *vm, uint32_t i);
 
+/* IEC/SCADA: edge detectors, latches, demux */
+void op_rising_edge(vm_state_t *vm, uint32_t i);
+void op_falling_edge(vm_state_t *vm, uint32_t i);
+void op_edge_both(vm_state_t *vm, uint32_t i);
+
+void op_rs_latch(vm_state_t *vm, uint32_t i); /* R has priority */
+void op_sr_latch(vm_state_t *vm, uint32_t i); /* S has priority */
+
+void op_demux(vm_state_t *vm, uint32_t i);
+
 void op_jmp(vm_state_t *vm, uint32_t i);
 void op_jmp_if(vm_state_t *vm, uint32_t i);
 void op_jmp_if_not(vm_state_t *vm, uint32_t i);

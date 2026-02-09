@@ -159,6 +159,15 @@ typedef struct vm_state {
     bool ctd_prev_input[MAX_TIMERS];
     bool ctud_prev_up[MAX_TIMERS];
     bool ctud_prev_down[MAX_TIMERS];
+
+      /* === Generic edge detection / latches === */
+    /* Предыдущее состояние входа для generic edge-detect (rising/falling/both) */
+    bool edge_prev_input[MAX_TIMERS];
+
+    /* Latches storage (по одному слоту на id 0..MAX_TIMERS-1) */
+    bool rs_latches[MAX_TIMERS];  /* RS: reset has priority (R then S) */
+    bool sr_latches[MAX_TIMERS];  /* SR: set has priority (S then R) */
+
 } vm_state_t;
 
 /* Функции управления жизненным циклом VM */

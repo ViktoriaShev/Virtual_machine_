@@ -1,8 +1,8 @@
-// Простой ассемблер для VM: текст -> binary (32-bit words
 // asm2bin.c
-// Ассемблер -> бинарник для VM32 (обновлённая версия с явными immediate '#')
-// Использование: asm2bin input.asm output.bin [--raw-halt]
+// Ассемблер -> бинарник для VM32 (поддержка C immediate '#')
+// Usage: asm2bin input.asm output.bin [--raw-halt]
 
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -21,17 +21,12 @@ typedef enum {
 
 typedef struct {
     const char *name;
-    int code;
+    int code;   // оставлено для ясности — используем индекс в op_table как opcode
     CFlags cflags;
 } OpEntry;
 
-/* ----- Таблица opcode'ов и политика для поля C ----- */
-/* Пометки основаны на коде, который ты прислала:
-   — допускающие immediate в поле C (по списку): arithmetic, logic, comparisons,
-     add_time/sub_time, строки (left,right,mid,insert,delete,replace),
-     таймеры (ton,tof,tp), счётчики (ctu,ctd), limit, mux, переходы.
-   — НЕ допускающие: concat, sel, ctud (требуют C как регистр/адрес).
-   — exit обрабатывается отдельно (слегка спец. поведение).
+/* ----- Таблица opcode'ов и политика для поля C -----
+   Порядок здесь должен совпадать с порядком в default_op_ex в vm32.c
 */
 static OpEntry op_table[] = {
     {"add",0, CFLAG_ALLOW_IMM},
@@ -99,19 +94,31 @@ static OpEntry op_table[] = {
     {"sel",54, CFLAG_C_MUST_REG},
     {"mux",55, CFLAG_ALLOW_IMM},
 
-    {"jmp",56, CFLAG_ALLOW_IMM},
-    {"jmp_if",57, CFLAG_ALLOW_IMM},       // разрешаем imm (см. VM-семантику)
-    {"jmp_if_not",58, CFLAG_ALLOW_IMM},
+    /* NEW IEC/SCADA ops (added) */
+    {"rising_edge",56, CFLAG_ALLOW_IMM},
+    {"falling_edge",57, CFLAG_ALLOW_IMM},
+    {"edge_both",58, CFLAG_ALLOW_IMM},
+    {"rs_latch",59, CFLAG_ALLOW_IMM},
+    {"sr_latch",60, CFLAG_ALLOW_IMM},
+    {"demux",61, CFLAG_ALLOW_IMM}, /* demux: C may be imm (index) or reg */
 
-    {"exit",59, CFLAG_ALLOW_IMM}, // special: if A==0, immediate used as exit code
-    {"halt",60, CFLAG_NONE},
-    {"nop",61, CFLAG_NONE},
+    {"jmp",62, CFLAG_ALLOW_IMM},
+    {"jmp_if",63, CFLAG_ALLOW_IMM},
+    {"jmp_if_not",64, CFLAG_ALLOW_IMM},
+
+    {"exit",65, CFLAG_ALLOW_IMM}, // special: if A==0, immediate used as exit code
+    {"halt",66, CFLAG_NONE},
+    {"nop",67, CFLAG_NONE},
+
     {NULL,-1, CFLAG_NONE}
 };
 
 static int opcode_from_name(const char* name) {
-    for (OpEntry *e = op_table; e->name; e++) {
-        if (strcasecmp(e->name, name)==0) return (int)(e - op_table);
+    for (OpEntry *e = op_table; e->name; ++e) {
+        if (e->name == NULL) break;
+        if (strcasecmp(e->name, name) == 0) {
+            return (int)(e - op_table); /* возвращаем индекс в таблице */
+        }
     }
     return -1;
 }
@@ -176,7 +183,7 @@ int main(int argc, char** argv) {
     for (OpEntry *e = op_table; e->name; ++e) {
         if (e->cflags & CFLAG_ALLOW_IMM) fprintf(stderr, "%s ", e->name);
     }
-    fprintf(stderr, "\nNote: registers syntax = R<num>, immediate syntax = #<num> (range -127..128 for C)\n");
+    fprintf(stderr, "\nNote: registers syntax = R<num>, immediate syntax = #<num> (range -128..127 for C)\n");
 
     char line[MAX_LINE];
     unsigned long lineno = 0;
@@ -184,25 +191,25 @@ int main(int argc, char** argv) {
     while (fgets(line, sizeof(line), in)) {
         lineno++;
 
-        // trim leading spaces
+        /* trim leading spaces */
         char *p = line;
         while (*p && isspace((unsigned char)*p)) p++;
-        // skip empty lines and comments
+        /* skip empty lines and comments */
         if (*p == '\0' || *p == '\n' || *p == ';' || *p == '#') continue;
 
-        // remove trailing newline
+        /* remove trailing newline */
         char *nl = strchr(p, '\n'); if (nl) *nl = '\0';
-        // remove inline comments (start with ';' or '#')
+        /* remove inline comments (start with ';' or '#') */
         char *cpos = strpbrk(p, ";#");
         if (cpos) *cpos = '\0';
 
-        // tokenize
+        /* tokenize */
         char *tok = strtok(p, " \t,");
         if (!tok) continue;
 
-        // auto-map HALT -> EXIT 0 (unless raw-halt)
+        /* auto-map HALT -> EXIT 0 (unless raw-halt) */
         if (!raw_halt && strcasecmp(tok, "halt") == 0) {
-            tok = "exit";  // rewrite (behaviour: EXIT 0)
+            tok = "exit";  /* rewrite (behaviour: EXIT 0) */
         }
 
         int op_index = opcode_from_name(tok);
@@ -211,18 +218,20 @@ int main(int argc, char** argv) {
             fclose(in); fclose(out); return 1;
         }
         OpEntry *opent = &op_table[op_index];
-        int op = opent->code;
 
-        // default operands text
+        /* Use table index as opcode (keeps mapping aligned with op_table order) */
+        int op = op_index;
+
+        /* default operands text */
         char *tA = strtok(NULL, " \t,");
         char *tB = strtok(NULL, " \t,");
         char *tC = strtok(NULL, " \t,");
 
         int Areg = 0, Breg = 0;
-        Operand Cop; Cop.type = OP_REG; //Ccop:
+        Operand Cop; Cop.type = OP_REG;
         Cop.value = 0;
 
-        // Parse A
+        /* Parse A */
         if (tA) {
             if (parse_reg(tA, &Areg) != 0) {
                 fprintf(stderr,"Line %lu: bad operand A '%s' — expected R<n>\n",lineno,tA);
@@ -234,7 +243,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        // Parse B
+        /* Parse B */
         if (tB) {
             if (parse_reg(tB, &Breg) != 0) {
                 fprintf(stderr,"Line %lu: bad operand B '%s' — expected R<n>\n",lineno,tB);
@@ -246,57 +255,58 @@ int main(int argc, char** argv) {
             }
         }
 
-        // Parse C: depends on opcode policy
+        /* Parse C: depends on opcode policy */
         if (tC) {
             int r;
             int immv;
             if (parse_reg(tC, &r) == 0) {
-                // register was provided
+                /* register was provided */
                 if (!check_reg_range(r)) {
                     fprintf(stderr,"Line %lu: C register out of range (0..255): %d\n",lineno,r);
                     fclose(in); fclose(out); return 1;
                 }
                 Cop.type = OP_REG; Cop.value = r;
             } else if (parse_immediate(tC, &immv) == 0) {
-                // immediate provided
+                /* immediate provided */
                 if (!(opent->cflags & CFLAG_ALLOW_IMM)) {
                     fprintf(stderr,"Line %lu: Opcode '%s' does not allow immediate in C; use a register.\n", lineno, opent->name);
                     fclose(in); fclose(out); return 1;
                 }
-                /* Мы кодируем immediate как: бит8 = 1 (FIMM flag), биты0..7 = 8-bit signed immediate.
-                   Поэтому допустимый диапазон: -128 .. 127. */
-                if (!(immv >= -128 && immv <= 127)) {
+                if (!check_imm8_range(immv)) {
                     fprintf(stderr,"Line %lu: Immediate out of range for C operand (-128..127): %d\n", lineno, immv);
                     fclose(in); fclose(out); return 1;
                 }
                 Cop.type = OP_IMM; Cop.value = immv;
             } else {
-            // If no C token, default C = 0
+                fprintf(stderr,"Line %lu: bad operand C '%s' — expected R<n> or #<imm>\n", lineno, tC);
+                fclose(in); fclose(out); return 1;
+            }
+        } else {
+            /* No C token -> default C = 0 (register 0) */
             Cop.type = OP_REG; Cop.value = 0;
         }
-    }
 
-        // Check if opcode requires C to be a register
+        /* Check if opcode requires C to be a register */
         if ((opent->cflags & CFLAG_C_MUST_REG) && Cop.type == OP_IMM) {
             fprintf(stderr,"Line %lu: Opcode '%s' requires C to be a register (not immediate).\n", lineno, opent->name);
             fclose(in); fclose(out); return 1;
         }
 
-        // Range checks for op, A, B done; now build 32-bit word
+        /* Range checks for op, A, B done; now build 32-bit word */
         if (op < 0 || op > 0x7F) { fprintf(stderr,"Line %lu: opcode code out of range\n",lineno); fclose(in); fclose(out); return 1; }
 
         uint32_t Afield = (uint32_t)(Areg & 0xFF);
         uint32_t Bfield = (uint32_t)(Breg & 0xFF);
         uint32_t Cfield = 0;
 
-       if (Cop.type == OP_REG) {
+        if (Cop.type == OP_REG) {
             /* C as register: bit8 == 0, bits0..7 = reg index */
             Cfield = (uint32_t)(Cop.value & 0xFF);
         } else {
-            /* C as immediate: set bit8 = 1 to mark immediate, bits0..7 = 8-bit two's complement immediate */
+            /* C as immediate: set bit8 = 1 (FIMM), bits0..7 = 8-bit two's complement immediate */
             int v = Cop.value;               /* signed -128..127 */
             uint32_t low8 = (uint32_t)((uint8_t)v); /* take low 8 bits */
-            Cfield = (1u << 8) | (low8 & 0xFF);     /* bit8==1 => FIMM, low 8 bits immediate */
+            Cfield = (1u << 8) | (low8 & 0xFF);     /* FIMM flag in bit8 */
         }
         uint32_t word = ((uint32_t)op << 25) | (Afield << 17) | (Bfield << 9) | Cfield;
 
