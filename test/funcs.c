@@ -10,6 +10,7 @@
 /* --- Вспомогательные функции безопасности для работы со строками/памятью --- */
 
 static inline size_t safe_mem_remaining(vm_state_t *vm, uint32_t addr) {
+    (void)vm;
     if (addr >= VM_MEM_BYTES) return 0;
     return (size_t)(VM_MEM_BYTES - addr);
 }
@@ -25,6 +26,7 @@ static size_t safe_strlen_at(vm_state_t *vm, uint32_t addr) {
 
 /* копирует n байт из srcAddr в destAddr, с учётом границ VM */
 static size_t safe_memcpy_from_to(vm_state_t *vm, uint32_t destAddr, const uint8_t *src, size_t n) {
+    (void)vm;
     size_t rem = safe_mem_remaining(vm, destAddr);
     size_t to_copy = n;
     if (to_copy > rem) to_copy = rem;

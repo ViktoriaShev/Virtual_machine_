@@ -3,6 +3,7 @@
 #define VM32_H
 #define _POSIX_C_SOURCE 200809L
 
+#include "timers.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -70,7 +71,7 @@ typedef void (*op_ex_f)(struct vm_state *vm, uint32_t instruction);
 /* Forward declarations for timer structures */
 #define MAX_TIMERS 16
 
-typedef struct {
+/*typedef struct {
     bool enabled;
     bool input;
     bool output;
@@ -80,7 +81,7 @@ typedef struct {
     uint32_t preset_ms;
     uint32_t ET;
 } IEC_Timer;
-
+*/
 typedef struct {
     uint32_t value;
     uint32_t preset;

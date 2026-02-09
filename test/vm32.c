@@ -380,7 +380,7 @@ int run_program(vm_state_t *vm) {
         if (atomic_load(&vm_stop_requested)) {
             atomic_store(&vm->stop_requested, true);
         }
-        
+
         vm->cycle_count++;
         clock_gettime(CLOCK_MONOTONIC, &cycle_start);
         if (atomic_load(&vm->stop_requested)) {
@@ -388,19 +388,19 @@ int run_program(vm_state_t *vm) {
             break;
         }
         uint64_t cycle_start_ms = vm->time_ms;
-        if (logging_enabled && log_file) {
-            fprintf(log_file, "\n=== CYCLE %u START (time_ms=%llu) ===\n", vm->cycle_count, (unsigned long long)vm->time_ms);
+        if (vm->logging_enabled && vm->log_file) {
+            fprintf(vm->log_file, "\n=== CYCLE %u START (time_ms=%llu) ===\n", vm->cycle_count, (unsigned long long)vm->time_ms);
         }
 
         uint32_t start_hash = calculate_registers_hash(vm->reg, REG_COUNT);
-        if (logging_enabled && log_file) {
-            fprintf(log_file, "Registers hash at start: 0x%08X\n", start_hash);
+        if (vm->logging_enabled && vm->log_file) {
+            fprintf(vm->log_file, "Registers hash at start: 0x%08X\n", start_hash);
         }
 
         if (vm->config.enable_hash_check && vm->cycle_count == 1) {
             vm->prev_cycle_hash = start_hash;
-            if (logging_enabled && log_file) {
-                fprintf(log_file, "Initialized prev_cycle_hash = 0x%08X\n", vm->prev_cycle_hash);
+            if (vm->logging_enabled && vm->log_file) {
+                fprintf(vm->log_file, "Initialized prev_cycle_hash = 0x%08X\n", vm->prev_cycle_hash);
             }
         }
 
@@ -409,8 +409,8 @@ int run_program(vm_state_t *vm) {
         for (size_t mod_idx = 0; mod_idx < vm->module_count; ++mod_idx) {
             module_info_t *mod = &vm->modules[mod_idx];
 
-            if (logging_enabled && log_file) {
-                fprintf(log_file, "\n--- Executing module: %s (0x%X) ---\n", mod->name, mod->addr);
+            if (vm->logging_enabled && vm->log_file) {
+                fprintf(vm->log_file, "\n--- Executing module: %s (0x%X) ---\n", mod->name, mod->addr);
             }
 
             vm->running = true;
@@ -422,16 +422,16 @@ int run_program(vm_state_t *vm) {
 
             while (vm->running && instr_count < MAX_INSTRUCTIONS) {
                 if (vm->PC >= module_end || vm->PC < mod->addr) {
-                    if (logging_enabled && log_file) {
-                        fprintf(log_file, "INFO: Module %s completed (PC=0x%X)\n", mod->name, vm->PC);
+                    if (vm->logging_enabled && vm->log_file) {
+                        fprintf(vm->log_file, "INFO: Module %s completed (PC=0x%X)\n", mod->name, vm->PC);
                     }
                     break;
                 }
 
                 uint32_t instr = vm_mr32(vm, vm->PC);
                 if (instr == 0) {
-                    if (logging_enabled && log_file) {
-                        fprintf(log_file, "INFO: End of module %s at PC=0x%X\n", mod->name, vm->PC);
+                    if (vm->logging_enabled && vm->log_file) {
+                        fprintf(vm->log_file, "INFO: End of module %s at PC=0x%X\n", mod->name, vm->PC);
                     }
                     break;
                 }
@@ -478,8 +478,8 @@ int run_program(vm_state_t *vm) {
 
             total_instr_count += instr_count;
 
-            if (logging_enabled && log_file) {
-                fprintf(log_file, "Module %s: executed %lu instructions\n",
+            if (vm->logging_enabled && vm->log_file) {
+                fprintf(vm->log_file, "Module %s: executed %lu instructions\n",
                         mod->name, (unsigned long)instr_count);
             }
         }
@@ -496,21 +496,21 @@ int run_program(vm_state_t *vm) {
 
         if (vm->config.enable_hash_check) {
             if (vm->cycle_count > 1 && end_hash != vm->prev_cycle_hash) {
-                if (log_file) fprintf(log_file, "!!! HASH MISMATCH: Previous 0x%08X, current 0x%08X\n",
+                if (vm->log_file) fprintf(vm->log_file, "!!! HASH MISMATCH: Previous 0x%08X, current 0x%08X\n",
                                      vm->prev_cycle_hash, end_hash);
                 printf("!!! HASH MISMATCH detected on cycle %u\n", vm->cycle_count);
             }
             uint32_t cur_prog_hash = calculate_memory_hash(vm->mem, vm->PC_START, vm->program_size);
             if (cur_prog_hash != vm->program_hash) {
-                if (log_file) fprintf(log_file, "!!! PROGRAM MEMORY HASH MISMATCH\n");
+                if (vm->log_file) fprintf(vm->log_file, "!!! PROGRAM MEMORY HASH MISMATCH\n");
                 printf("!!! PROGRAM MEMORY HASH MISMATCH on cycle %u\n", vm->cycle_count);
             }
         }
         vm->prev_cycle_hash = end_hash;
 
-        if (logging_enabled && log_file) {
-            fprintf(log_file, "Registers hash at end: 0x%08X\n", end_hash);
-            fprintf(log_file, "time_ms at end: %llu (delta: %llu ms)\n",
+        if (vm->logging_enabled && vm->log_file) {
+            fprintf(vm->log_file, "Registers hash at end: 0x%08X\n", end_hash);
+            fprintf(vm->log_file, "time_ms at end: %llu (delta: %llu ms)\n",
                     (unsigned long long)vm->time_ms,
                     (unsigned long long)(vm->time_ms - cycle_start_ms));
         }
@@ -519,9 +519,9 @@ int run_program(vm_state_t *vm) {
         long elapsed_ms = vm_get_elapsed_ms(cycle_start, cycle_end);
         long remaining_ms = vm->config.cycle_time_ms - elapsed_ms;
 
-        if (logging_enabled && log_file) {
-            fprintf(log_file, "VM elapsed this cycle: %ld ms\n", elapsed_ms);
-            fprintf(log_file, "=== CYCLE %u END: %lu instructions in %ld ms ===\n",
+        if (vm->logging_enabled && vm->log_file) {
+            fprintf(vm->log_file, "VM elapsed this cycle: %ld ms\n", elapsed_ms);
+            fprintf(vm->log_file, "=== CYCLE %u END: %lu instructions in %ld ms ===\n",
                     vm->cycle_count, (unsigned long)total_instr_count, elapsed_ms);
         }
 
@@ -530,10 +530,16 @@ int run_program(vm_state_t *vm) {
                (unsigned long long)vm->time_ms);
 
         if (remaining_ms > 0) {
-            usleep((useconds_t)(remaining_ms * 1000));
-        } else if (vm->config.enable_cycle_check) {
+            struct timespec sleep_time;
+            sleep_time.tv_sec = remaining_ms / 1000;
+            sleep_time.tv_nsec = (remaining_ms % 1000) * 1000000L;
+            nanosleep(&sleep_time, NULL);
+        } 
+        else if (vm->config.enable_cycle_check) {
             printf("!!! WARNING: Cycle %u overrun by %ld ms\n", vm->cycle_count, -remaining_ms);
         }
+            
+
     }
 
     close_logging(vm);
