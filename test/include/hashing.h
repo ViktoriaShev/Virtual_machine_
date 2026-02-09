@@ -15,7 +15,11 @@
    - CRC32 for hash keys (cached in bins)
    - Generic key/value support via function pointers
    - Proper memory ownership (table owns all data)
+   - VM32 instance-aware operations
    ============================================================================ */
+
+/* Forward declaration для избежания циклических зависимостей */
+typedef struct vm_state vm_state_t;
 
 /* ----------------------------
    Типы функций для работы с ключами/значениями
@@ -71,7 +75,7 @@ typedef struct {
    Структура хеш-таблицы
    ---------------------------- */
 
-typedef struct {
+typedef struct hash_table {
     hash_bin_t *bins;        // Массив ячеек
     uint32_t size;           // Размер таблицы (всегда степень 2)
     uint32_t used;           // Кол-во bins в пробировании
@@ -80,7 +84,7 @@ typedef struct {
     /* Функции для работы с типами */
     const key_type_t *key_type;
     const value_type_t *value_type;
-} hash_table;
+} hash_table_t;
 
 /* ----------------------------
    Основные операции (API из Главы 5)
@@ -156,22 +160,46 @@ extern const key_type_t ptr_key_type;
 extern const value_type_t ptr_value_type;
 
 /* ----------------------------
-   Специализированные функции для VM32
+   Специализированные функции для VM32 (инстансные)
    ---------------------------- */
 
-/* Хеш состояния регистров */
+/* Хеш состояния регистров конкретной VM */
+uint32_t vm_calculate_registers_hash(const vm_state_t *vm);
+
+/* Хеш всех регистров (альтернативная версия) */
 uint32_t calculate_registers_hash(const uint32_t *registers, size_t count);
 
-/* Хеш блока памяти */
-uint32_t calculate_memory_hash(const uint8_t *memory, 
-                                uint32_t start_addr, 
-                                size_t length);
+/* Хеш блока памяти VM */
+uint32_t vm_calculate_memory_hash(
+    const vm_state_t *vm,
+    uint32_t start_addr,
+    size_t length
+);
 
-/* Проверка целостности */
-bool verify_data_integrity(const void *data, 
-                           size_t length, 
-                           uint32_t expected_crc);
+/* Хеш блока памяти (общая версия) */
+uint32_t calculate_memory_hash(
+    const uint8_t *memory,
+    uint32_t start_addr,
+    size_t length
+);
 
+/* Проверка целостности данных */
+bool verify_data_integrity(
+    const void *data,
+    size_t length,
+    uint32_t expected_crc
+);
 
+/* Хеш всего состояния VM (для сохранения/восстановления) */
+uint32_t vm_calculate_state_hash(const vm_state_t *vm);
+
+/* Инкрементальное обновление хеша регистров */
+void vm_update_register_hash(vm_state_t *vm, uint8_t reg_num);
+
+/* Обновить инкрементальный хеш всех регистров */
+void vm_update_all_register_hashes(vm_state_t *vm);
+
+/* Вычислить хеш программы в памяти VM */
+uint32_t vm_calculate_program_hash(const vm_state_t *vm);
 
 #endif /* HASHING_H */

@@ -86,7 +86,7 @@ typedef struct {
     uint32_t preset;
 } CT_Counter;
 
-/* Основная структура состояния VM */
+/* Основная структура состоянвия VM */
 typedef struct vm_state {
     /* конфигурация (копия) */
     vm_config_t config;
@@ -101,7 +101,7 @@ typedef struct vm_state {
 
     /* состояние исполнения */
     bool running;
-    atomic_bool stop_requested; /* управление остановкой инстанса */
+    atomic_bool stop_requested; /* упраление остановкой инстанса */
     int exit_code;              /* код выхода при op_exit */
 
     /* время/тайминги */
