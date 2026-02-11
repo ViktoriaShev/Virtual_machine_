@@ -1,4 +1,4 @@
-// asm2bin.c
+// converter.c
 // Ассемблер -> бинарник для VM32 (поддержка C immediate '#')
 // Usage: asm2bin input.asm output.bin [--raw-halt]
 
