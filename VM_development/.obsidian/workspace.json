@@ -41,12 +41,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Пособие - как писать на псевдоассемблере.md",
+                "file": "Интеграция в скелет.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Пособие - как писать на псевдоассемблере"
+              "title": "Интеграция в скелет"
             }
           }
         ],
@@ -200,28 +200,28 @@
   },
   "active": "84acdd41622e1bee",
   "lastOpenFiles": [
+    "Тестирование.md",
+    "Схема работ.md",
     "Описание и характеристики  VM32 для контроллеров (PLC).md",
+    "Полезные материалы.md",
+    "Дальнейшее развитие виртуальной машины VM32.md",
     "Интеграция в скелет.md",
+    "Таблица operational codes.md",
+    "public/Диаграмма вм.png",
+    "public/Pasted image 20250722102957.png",
+    "public/General_chart_of_vm.drawio.svg",
+    "public/Форма команды.drawio.png",
+    "public/Типы команд.drawio.png",
     "Пособие - как писать на псевдоассемблере.md",
     "Режим immediate.md",
     "Описание Makefile, функции командной строки.md",
-    "Таблица operational codes.md",
-    "Схема работ.md",
     "VM_dairy.md",
     "Тестовые испытания VM.md",
-    "Тестирование.md",
     "Сделать.md",
     "Приложение - Хеширование в проекте VM32**.md",
     "Приложение - как считать.md",
-    "Полезные материалы.md",
-    "Диаграмма вм.png",
-    "Дальнейшее развитие виртуальной машины VM32.md",
     "Введение.md",
     "Вопросы подкачки.md",
-    "public/Форма команды.drawio.png",
-    "public/Типы команд.drawio.png",
-    "public/General_chart_of_vm.drawio.svg",
-    "public/Pasted image 20250722102957.png",
     "Untitled 1.md",
     "Размышления об архитектуре будущей полной VM.md",
     "Диаграмма без названия.drawio(2).png",
