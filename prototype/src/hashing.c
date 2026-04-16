@@ -552,7 +552,7 @@ uint32_t vm_calculate_state_hash(const vm_state_t *vm) {
 
 /* Инкрементальное обновление хеша одного регистра */
 void vm_update_register_hash(vm_state_t *vm, uint8_t reg_num) {
-    if (!vm || reg_num >= REG_COUNT) return;
+    if (!vm) return;
     
     /* Вычислить хеш конкретного регистра */
     vm->incremental.reg_hashes[reg_num] = crc32(&vm->reg[reg_num], sizeof(uint32_t));

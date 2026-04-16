@@ -115,6 +115,7 @@ endif
 # =========================================================
 # Tests (auto-discovery)
 # =========================================================
+
 $(TEST_BUILD)/%: $(TEST_DIR)/%.c $(VM_SRCS) | dirs
 	$(HOST_CC) $(CFLAGS) -DUNIT_TEST -o $@ $^ $(LDLIBS)
 
@@ -147,3 +148,51 @@ clean:
 	rm -rf coverage.info out-coverage
 
 .PHONY: all clean convert run debug test coverage coverage-report
+
+# === HOT RELOAD TEST ===
+HOT_RELOAD_CFLAGS = -DVM_NO_MAIN -std=c11 -O2 -Wall -Wextra -Iinclude
+
+$(OBJ_DIR)/vm_host_vm32.o: $(SRC_DIR)/vm32.c | dirs
+	$(VM_CC) $(HOT_RELOAD_CFLAGS) -c $< -o $@
+
+
+# =========================================================
+# HOT RELOAD TEST (separate build)
+# =========================================================
+
+# =========================================================
+# HOT RELOAD TEST (separate build)
+# =========================================================
+
+HOT_RELOAD_TEST := $(BIN_DIR)/hot_reload_test
+
+HOT_RELOAD_CFLAGS := -std=c11 -O2 -Wall -Wextra -I$(INC_DIR) -DVM_NO_MAIN
+
+HOT_RELOAD_VM_OBJ := $(OBJ_DIR)/vm32_hot.o
+HOT_RELOAD_TEST_OBJ := $(OBJ_DIR)/hot_reload_test.o
+
+HOT_RELOAD_OBJS := \
+	$(OBJ_DIR)/vm_host_cleanup.o \
+	$(OBJ_DIR)/vm_host_debug.o \
+	$(OBJ_DIR)/vm_host_funcs.o \
+	$(OBJ_DIR)/vm_host_hashing.o \
+	$(OBJ_DIR)/vm_host_loader.o \
+	$(OBJ_DIR)/vm_host_timers.o \
+	$(OBJ_DIR)/vm_host_vm_tables.o \
+	$(HOT_RELOAD_VM_OBJ) \
+	$(HOT_RELOAD_TEST_OBJ)
+
+# VM core compiled WITHOUT main for test
+$(HOT_RELOAD_VM_OBJ): $(SRC_DIR)/vm32.c | dirs
+	$(VM_CC) $(HOT_RELOAD_CFLAGS) -c $< -o $@
+
+# test file
+$(HOT_RELOAD_TEST_OBJ): $(TEST_DIR)/hot_reload_test.c | dirs
+	$(VM_CC) $(HOT_RELOAD_CFLAGS) -c $< -o $@
+
+# link
+$(HOT_RELOAD_TEST): $(HOT_RELOAD_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(VM_CC) -o $@ $^ -lm -latomic
+
+hot_reload_test: $(HOT_RELOAD_TEST)

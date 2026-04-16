@@ -465,10 +465,22 @@ const value_type_t ptr_value_type = {
     .del = ptr_free
 };
 
+/* ----------------------------
+   VM32-специфичные функции хеширования
+   ---------------------------- */
+
+/* Общая версия (без VM instance) */
 uint32_t calculate_registers_hash(const uint32_t *registers, size_t count) {
     return crc32(registers, count * sizeof(uint32_t));
 }
 
+/* Инстансная версия - хеш всех регистров VM */
+uint32_t vm_calculate_registers_hash(const vm_state_t *vm) {
+    if (!vm) return 0;
+    return crc32(vm->reg, REG_COUNT * sizeof(uint32_t));
+}
+
+/* Общая версия (без VM instance) */
 uint32_t calculate_memory_hash(
     const uint8_t *memory,
     uint32_t start_addr,
@@ -478,6 +490,24 @@ uint32_t calculate_memory_hash(
     return crc32(memory + start_addr, length);
 }
 
+/* Инстансная версия - хеш блока памяти VM */
+uint32_t vm_calculate_memory_hash(
+    const vm_state_t *vm,
+    uint32_t start_addr,
+    size_t length
+) {
+    if (!vm || !vm->mem) return 0;
+    if (start_addr >= VM_MEM_BYTES) return 0;
+    
+    /* Ограничить length границами памяти */
+    if (start_addr + length > VM_MEM_BYTES) {
+        length = VM_MEM_BYTES - start_addr;
+    }
+    
+    return crc32(vm->mem + start_addr, length);
+}
+
+/* Проверка целостности данных */
 bool verify_data_integrity(
     const void *data,
     size_t length,
@@ -486,3 +516,68 @@ bool verify_data_integrity(
     return crc32(data, length) == expected_crc;
 }
 
+/* Хеш всего состояния VM (для snapshot/restore) */
+uint32_t vm_calculate_state_hash(const vm_state_t *vm) {
+    if (!vm) return 0;
+    
+    uint32_t crc = crc32_begin();
+    
+    /* 1. Регистры */
+    crc = crc32_update(crc, vm->reg, REG_COUNT * sizeof(uint32_t));
+    
+    /* 2. PC */
+    crc = crc32_update(crc, &vm->PC, sizeof(vm->PC));
+    
+    /* 3. Память (только используемая часть программы) */
+    if (vm->program_size > 0 && vm->mem) {
+        size_t mem_to_hash = vm->program_size;
+        if (mem_to_hash > VM_MEM_BYTES) {
+            mem_to_hash = VM_MEM_BYTES;
+        }
+        crc = crc32_update(crc, vm->mem, mem_to_hash);
+    }
+    
+    /* 4. Таймеры (состояние) */
+    crc = crc32_update(crc, vm->ton_timers, sizeof(vm->ton_timers));
+    crc = crc32_update(crc, vm->tof_timers, sizeof(vm->tof_timers));
+    crc = crc32_update(crc, vm->tp_timers, sizeof(vm->tp_timers));
+    
+    /* 5. Счётчики */
+    crc = crc32_update(crc, vm->ctu_counters, sizeof(vm->ctu_counters));
+    crc = crc32_update(crc, vm->ctd_counters, sizeof(vm->ctd_counters));
+    crc = crc32_update(crc, vm->ctud_counters, sizeof(vm->ctud_counters));
+    
+    return crc32_finalize(crc);
+}
+
+/* Инкрементальное обновление хеша одного регистра */
+void vm_update_register_hash(vm_state_t *vm, uint8_t reg_num) {
+    if (!vm || reg_num >= REG_COUNT) return;
+    
+    /* Вычислить хеш конкретного регистра */
+    vm->incremental.reg_hashes[reg_num] = crc32(&vm->reg[reg_num], sizeof(uint32_t));
+}
+
+/* Обновить хеши всех регистров */
+void vm_update_all_register_hashes(vm_state_t *vm) {
+    if (!vm) return;
+    
+    for (size_t i = 0; i < REG_COUNT; i++) {
+        vm->incremental.reg_hashes[i] = crc32(&vm->reg[i], sizeof(uint32_t));
+    }
+    
+    /* Также обновить общий инкрементальный хеш */
+    vm->incremental.incremental_hash = vm_calculate_registers_hash(vm);
+}
+
+/* Вычислить хеш загруженной программы */
+uint32_t vm_calculate_program_hash(const vm_state_t *vm) {
+    if (!vm || !vm->mem || vm->program_size == 0) return 0;
+    
+    size_t hash_size = vm->program_size;
+    if (hash_size > VM_MEM_BYTES) {
+        hash_size = VM_MEM_BYTES;
+    }
+    
+    return crc32(vm->mem, hash_size);
+}

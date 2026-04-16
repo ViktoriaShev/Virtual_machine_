@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "vm32.h"
 
 /* tables lifecycle */
 int vm_tables_init(vm_state_t *vm);

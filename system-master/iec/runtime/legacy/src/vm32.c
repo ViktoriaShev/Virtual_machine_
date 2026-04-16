@@ -18,7 +18,6 @@
 #include <signal.h>
 #include <unistd.h>   // usleep
 
-
 /* ----------------------------
    Константы
    ---------------------------- */
@@ -83,7 +82,6 @@ vm_state_t *vm_create(void) {
     vm->PC = 0;
     vm->running = true;
     atomic_init(&vm->stop_requested, false);
-    atomic_init(&vm->reload_pending, false);
     vm->time_ms = 0;
     vm->instr_ns_accum = 0;
     vm->program_hash = 0;
@@ -189,7 +187,6 @@ int vm_init_defaults(vm_state_t *vm) {
     vm->cycle_count = 0;
     vm->prev_cycle_hash = 0;
     atomic_store(&vm->stop_requested, false);
-    atomic_store(&vm->reload_pending, false);
     vm->running = true;
     vm->time_ms = 0;
     vm->instr_ns_accum = 0;
@@ -236,7 +233,6 @@ int vm_reset(vm_state_t *vm) {
 
     /* базовые поля */
     atomic_store(&vm->stop_requested, false);
-    atomic_store(&vm->reload_pending, false);
     vm->running = true;
     vm->exit_code = 0;
     vm->cycle_count = 0;
@@ -377,15 +373,20 @@ int run_program(vm_state_t *vm) {
     printf("Clock rate: %u Hz\n", vm->config.clock_rate_hz);
     printf("\n");
 
+    /* локальный PC-stack (пер-вызовный, не делаем полем vm, можно вынести при необходимости) */
+        /* локальный PC-stack (пер-вызовный) */
+    uint32_t pc_stack[256];
+    uint32_t pc_stack_ptr = 0;
+    /* Если понадобятся push/pop, используйте прямые операции с pc_stack и pc_stack_ptr:
+         if (pc_stack_ptr < sizeof(pc_stack)/sizeof(pc_stack[0])) pc_stack[pc_stack_ptr++] = value;
+         if (pc_stack_ptr > 0) { uint32_t v = pc_stack[--pc_stack_ptr]; ... }
+       Сейчас push/pop не используются в этом цикле, поэтому никаких вспомогательных функций не требуется. */
+
+
     while (1) {
 
         if (atomic_load(&vm_stop_requested)) {
             atomic_store(&vm->stop_requested, true);
-        }
-
-        // *** НОВОЕ: проверка hot-reload ***
-        if (atomic_load(&vm->reload_pending)) {
-            apply_pending_reload(vm);
         }
 
         vm->cycle_count++;
@@ -422,6 +423,7 @@ int run_program(vm_state_t *vm) {
 
             vm->running = true;
             vm->PC = mod->addr;
+            pc_stack_ptr = 0;
 
             uint64_t instr_count = 0;
             uint32_t module_end = mod->addr + mod->size;
@@ -550,6 +552,127 @@ int run_program(vm_state_t *vm) {
 
     close_logging(vm);
     return 0;
+}
+
+/* vm_run_one_cycle: execute exactly one PLC-cycle for the given vm instance.
+   Returns 0 on normal return, 1 if stop was requested, -1 on error. */
+int vm_run_one_cycle(vm_state_t *vm) {
+    if (!vm) return -1;
+
+    struct timespec cycle_start, cycle_end;
+    vm_init_timer(vm);
+
+    if (atomic_load(&vm->stop_requested)) {
+        run_cleanups();
+        return 1;
+    }
+
+    vm->cycle_count++;
+    clock_gettime(CLOCK_MONOTONIC, &cycle_start);
+    uint64_t cycle_start_ms = vm->time_ms;
+
+    if (vm->logging_enabled && vm->log_file) {
+        fprintf(vm->log_file, "\n=== CYCLE %u START (time_ms=%llu) ===\n",
+                vm->cycle_count, (unsigned long long)vm->time_ms);
+    }
+
+    uint32_t start_hash = calculate_registers_hash(vm->reg, REG_COUNT);
+    if (vm->config.enable_hash_check && vm->cycle_count == 1) {
+        vm->prev_cycle_hash = start_hash;
+    }
+
+    uint64_t total_instr_count = 0;
+
+    for (size_t mod_idx = 0; mod_idx < vm->module_count; ++mod_idx) {
+        module_info_t *mod = &vm->modules[mod_idx];
+
+        if (vm->logging_enabled && vm->log_file) {
+            fprintf(vm->log_file, "\n--- Executing module: %s (0x%X) ---\n", mod->name, mod->addr);
+        }
+
+        vm->running = true;
+        vm->PC = mod->addr;
+
+        uint64_t instr_count = 0;
+        uint32_t module_end = mod->addr + mod->size;
+
+        while (vm->running && instr_count < MAX_INSTRUCTIONS) {
+            if (vm->PC >= module_end || vm->PC < mod->addr) break;
+
+            uint32_t instr = vm_mr32(vm, vm->PC);
+            if (instr == 0) break;
+
+            decoded_instr_t *d = vm_decode_instruction(vm, vm->PC);
+            if (!d) { vm->running = false; break; }
+
+            uint8_t opcode = OPC(d->raw_instr);
+            if (opcode >= OPCODE_COUNT || vm->op_ex[opcode] == NULL) {
+                vm->running = false;
+                break;
+            }
+
+            uint32_t old_pc = vm->PC;
+            log_before(vm, vm->PC, d->raw_instr);
+            vm->op_ex[opcode](vm, d->raw_instr);
+            if (vm->PC == old_pc) vm->PC += 4;
+            log_after(vm, vm->PC);
+
+            instr_count++;
+            vm_wait_for_tick(vm);
+
+            /* update vm->time_ms bookkeeping */
+            if (vm->config.enable_tick_timing && vm->config.clock_rate_hz != 0) {
+                struct timespec __now; clock_gettime(CLOCK_MONOTONIC, &__now);
+                vm->time_ms = (uint64_t)__now.tv_sec * 1000ULL + (uint64_t)(__now.tv_nsec / 1000000ULL);
+            } else if (vm->config.clock_rate_hz != 0) {
+                uint64_t instr_ns = 1000000000ULL / (uint64_t)vm->config.clock_rate_hz;
+                vm->instr_ns_accum += instr_ns;
+                uint64_t add_ms = vm->instr_ns_accum / 1000000ULL;
+                if (add_ms) {
+                    vm->time_ms += add_ms;
+                    vm->instr_ns_accum -= add_ms * 1000000ULL;
+                }
+            }
+        } /* end module */
+
+        total_instr_count += instr_count;
+        if (vm->logging_enabled && vm->log_file) {
+            fprintf(vm->log_file, "Module %s: executed %lu instructions\n",
+                    mod->name, (unsigned long)instr_count);
+        }
+    } /* end modules loop */
+
+    /* Post-cycle housekeeping */
+    if (!vm->config.enable_tick_timing) {
+        uint64_t expected_end = cycle_start_ms + (uint64_t)vm->config.cycle_time_ms;
+        if (vm->time_ms < expected_end) vm->time_ms = expected_end;
+    }
+
+    update_all_timers(vm);
+
+    uint32_t end_hash = calculate_registers_hash(vm->reg, REG_COUNT);
+    if (vm->config.enable_hash_check) {
+        if (vm->cycle_count > 1 && end_hash != vm->prev_cycle_hash) {
+            if (vm->log_file) fprintf(vm->log_file, "!!! HASH MISMATCH: Prev 0x%08X cur 0x%08X\n",
+                                     vm->prev_cycle_hash, end_hash);
+        }
+        uint32_t cur_prog_hash = calculate_memory_hash(vm->mem, vm->PC_START, vm->program_size);
+        if (cur_prog_hash != vm->program_hash) {
+            if (vm->log_file) fprintf(vm->log_file, "!!! PROGRAM MEMORY HASH MISMATCH\n");
+        }
+    }
+    vm->prev_cycle_hash = end_hash;
+
+    clock_gettime(CLOCK_MONOTONIC, &cycle_end);
+    long elapsed_ms = vm_get_elapsed_ms(cycle_start, cycle_end);
+
+    if (vm->logging_enabled && vm->log_file) {
+        fprintf(vm->log_file, "=== CYCLE %u END: %lu instructions in %ld ms ===\n",
+                vm->cycle_count, (unsigned long)total_instr_count, elapsed_ms);
+    }
+
+    /* return 1 if stop requested, 0 otherwise */
+    return atomic_load(&vm->stop_requested) ? 1 : 0;
 }
 
 /* ----------------------------

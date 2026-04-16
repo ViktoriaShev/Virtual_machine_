@@ -27,7 +27,7 @@ typedef enum {
     HASH_CRC32
 } hash_algorithm_t;
 
-/* Конфигурация VM (копия вашего vm_config_t) */
+/* Конфигурация VM */
 typedef struct {
     uint32_t clock_rate_hz;
     uint32_t cycle_time_ms;
@@ -82,6 +82,16 @@ typedef void (*op_ex_f)(struct vm_state *vm, uint32_t instruction);
     uint32_t ET;
 } IEC_Timer;
 */
+
+typedef struct {
+    char   *new_name;       // имя нового файла модуля (для отчёта/лога)
+    uint8_t *buffer;        // временный буфер с новым образцом
+    size_t  size;           // размер нового образа
+    uint32_t target_addr;   // адрес замещаемого модуля в памяти VM
+    size_t  module_index;   // индекс заменяемого модуля в vm->modules
+    uint32_t new_hash;      // CRC32 нового образа (предварительно вычисленный)
+} pending_reload_t;
+
 typedef struct {
     uint32_t value;
     uint32_t preset;
@@ -104,6 +114,8 @@ typedef struct vm_state {
     bool running;
     atomic_bool stop_requested; /* упраление остановкой инстанса */
     int exit_code;              /* код выхода при op_exit */
+    pending_reload_t pending_reload;   // данные отложенной замены
+    atomic_bool reload_pending;        // атомарный флаг ожидания замены
 
     /* время/тайминги */
     uint64_t time_ms;
@@ -170,9 +182,12 @@ typedef struct vm_state {
     /* Latches storage (по одному слоту на id 0..MAX_TIMERS-1) */
     bool rs_latches[MAX_TIMERS];  /* RS: reset has priority (R then S) */
     bool sr_latches[MAX_TIMERS];  /* SR: set has priority (S then R) */
-
+    
 } vm_state_t;
 
+// TODO: поддержка CALL/RET (в будущих версиях)
+// uint32_t pc_stack[256];
+// uint32_t pc_stack_ptr;
 /* Функции управления жизненным циклом VM */
 vm_state_t *vm_create(void);                  /* выделяет vm_state и mem */
 void vm_destroy(vm_state_t *vm);              /* освобождает всё */
