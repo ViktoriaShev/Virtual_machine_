@@ -598,7 +598,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    const char *program_dir = (argc >= 2) ? argv[1] : "build/bin";
+    const char *program_dir = (argc >= 2) ? argv[1] : "build/programs";
 
     vm->program_dir = strdup(program_dir);
     if (!vm->program_dir) {
@@ -607,16 +607,17 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    /* первая загрузка */
     if (reload_programs_from_directory(vm, vm->program_dir) != 0) {
         fprintf(stderr, "Initial load failed\n");
         vm_destroy(vm);
         return 1;
     }
 
-    /* зафиксировать стартовую сигнатуру, чтобы первая же проверка не вызвала reload */
+    /* зафиксировать сигнатуру */
     directory_changed(vm->program_dir, &vm->program_dir_signature);
 
-    /* Установим глобальную переменную для обработчика сигналов (CLI: один активный VM) */
+/* сигналы */
     g_active_vm_for_signal = vm;
     signal(SIGINT, handle_sigterm_global);
     signal(SIGTERM, handle_sigterm_global);
