@@ -159,11 +159,6 @@ $(OBJ_DIR)/vm_host_vm32.o: $(SRC_DIR)/vm32.c | dirs
 # =========================================================
 # HOT RELOAD TEST (separate build)
 # =========================================================
-
-# =========================================================
-# HOT RELOAD TEST (separate build)
-# =========================================================
-
 HOT_RELOAD_TEST := $(BIN_DIR)/hot_reload_test
 
 HOT_RELOAD_CFLAGS := -std=c11 -O2 -Wall -Wextra -I$(INC_DIR) -DVM_NO_MAIN

@@ -19,6 +19,11 @@
 #define REG_COUNT      256
 #define OPCODE_COUNT   128
 
+
+#ifndef MEM_LOG_SIZE
+#define MEM_LOG_SIZE 256
+#endif
+
 typedef struct hash_table hash_table_t;
 
 /* Хеш-алгоритм */
@@ -62,11 +67,6 @@ typedef struct {
 /* forward declare opcode function type */
 struct vm_state;
 typedef void (*op_ex_f)(struct vm_state *vm, uint32_t instruction);
-
-/* добавьте где-нибудь с константами (если ещё нет) */
-#ifndef MEM_LOG_SIZE
-#define MEM_LOG_SIZE 256
-#endif
 
 /* Forward declarations for timer structures */
 #define MAX_TIMERS 16
@@ -114,8 +114,10 @@ typedef struct vm_state {
     bool running;
     atomic_bool stop_requested; /* упраление остановкой инстанса */
     int exit_code;              /* код выхода при op_exit */
-    pending_reload_t pending_reload;   // данные отложенной замены
+    //pending_reload_t pending_reload;   // данные отложенной замены
     atomic_bool reload_pending;        // атомарный флаг ожидания замены
+    char *program_dir;
+    uint32_t program_dir_signature;
 
     /* время/тайминги */
     uint64_t time_ms;

@@ -9,6 +9,7 @@
 #include "timers.h"
 #include "vm_tables.h"
 #include "loader.h"
+#include "hot_reload.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -24,7 +25,6 @@
 #define MAX_INSTRUCTIONS 100000
 #define DEFAULT_PC_START 0x3000
 
-uint32_t dir_sig = 0;
 /* ----------------------------
    Локальная таблица опкодов (шаблон)
    При создании vm эта таблица копируется в vm->op_ex.
@@ -84,6 +84,8 @@ vm_state_t *vm_create(void) {
     vm->running = true;
     atomic_init(&vm->stop_requested, false);
     atomic_init(&vm->reload_pending, false);
+    vm->program_dir = NULL;
+    vm->program_dir_signature = 0;
     vm->time_ms = 0;
     vm->instr_ns_accum = 0;
     vm->program_hash = 0;
@@ -168,6 +170,11 @@ void vm_destroy(vm_state_t *vm) {
     if (vm->log_file) {
         fclose(vm->log_file);
         vm->log_file = NULL;
+    }
+
+    if (vm->program_dir) {
+        free(vm->program_dir);
+        vm->program_dir = NULL;
     }
 
     free(vm);
@@ -379,10 +386,12 @@ int run_program(vm_state_t *vm) {
 
     while (1) {
 
-        if (directory_changed("build/bin", &dir_sig)) {
-            printf("Directory change detected → reloading\n");
-            reload_programs_from_directory(vm, "build/bin");
+        if (vm->program_dir && directory_changed(vm->program_dir, &vm->program_dir_signature)) {
+            atomic_store(&vm->reload_pending, true);
         }
+
+        apply_pending_reload(vm);
+
         if (atomic_load(&vm_stop_requested)) {
             atomic_store(&vm->stop_requested, true);
         }
@@ -593,6 +602,24 @@ int main(int argc, char **argv) {
         free(filenames);
         return 1;
     }
+
+    const char *program_dir = (argc >= 2) ? argv[1] : "build/bin";
+
+    vm->program_dir = strdup(program_dir);
+    if (!vm->program_dir) {
+        fprintf(stderr, "Failed to allocate program_dir\n");
+        vm_destroy(vm);
+        return 1;
+    }
+
+    if (reload_programs_from_directory(vm, vm->program_dir) != 0) {
+        fprintf(stderr, "Initial load failed\n");
+        vm_destroy(vm);
+        return 1;
+    }
+
+    /* зафиксировать стартовую сигнатуру, чтобы первая же проверка не вызвала reload */
+    directory_changed(vm->program_dir, &vm->program_dir_signature);
 
     /* Установим глобальную переменную для обработчика сигналов (CLI: один активный VM) */
     g_active_vm_for_signal = vm;
