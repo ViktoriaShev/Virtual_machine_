@@ -9,7 +9,4 @@
    Возвращает 0 при успехе, <0 при ошибке. */
 int load_programs(vm_state_t *vm, const char **fnames, int count);
 
-void apply_pending_reload(vm_state_t *vm);
-
-int vm_schedule_hot_reload(vm_state_t *vm, const char *filename, size_t module_index); 
 #endif /* LOADER_H */

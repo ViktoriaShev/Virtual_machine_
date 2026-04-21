@@ -18,13 +18,13 @@
 #include <signal.h>
 #include <unistd.h>   // usleep
 
-
 /* ----------------------------
    Константы
    ---------------------------- */
 #define MAX_INSTRUCTIONS 100000
 #define DEFAULT_PC_START 0x3000
 
+uint32_t dir_sig = 0;
 /* ----------------------------
    Локальная таблица опкодов (шаблон)
    При создании vm эта таблица копируется в vm->op_ex.
@@ -379,6 +379,10 @@ int run_program(vm_state_t *vm) {
 
     while (1) {
 
+        if (directory_changed("build/bin", &dir_sig)) {
+            printf("Directory change detected → reloading\n");
+            reload_programs_from_directory(vm, "build/bin");
+        }
         if (atomic_load(&vm_stop_requested)) {
             atomic_store(&vm->stop_requested, true);
         }
