@@ -396,11 +396,6 @@ int run_program(vm_state_t *vm) {
             atomic_store(&vm->stop_requested, true);
         }
 
-        // *** НОВОЕ: проверка hot-reload ***
-        if (atomic_load(&vm->reload_pending)) {
-            apply_pending_reload(vm);
-        }
-
         vm->cycle_count++;
         clock_gettime(CLOCK_MONOTONIC, &cycle_start);
         if (atomic_load(&vm->stop_requested)) {

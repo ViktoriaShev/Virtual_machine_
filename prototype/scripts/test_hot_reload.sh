@@ -2,13 +2,13 @@
 set -euo pipefail
 
 DIR=build/programs
+mkdir -p "$DIR"
 
 make clean
 make
 
-mkdir -p "$DIR"
-
 ./build/converter asm/program_v1.asm "$DIR/main.bin"
+
 ./build/vm32_host "$DIR" > build/hot_reload.log 2>&1 &
 PID=$!
 
