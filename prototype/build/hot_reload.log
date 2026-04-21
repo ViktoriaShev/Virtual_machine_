@@ -18,17 +18,13 @@ Cycle overrun check: enabled
 Tick timing: disabled
 Clock rate: 100 Hz
 
-!!! PROGRAM MEMORY HASH MISMATCH on cycle 1
-Cycle 1: 2 instructions, 0 ms elapsed, time_ms=10689493
+Cycle 1: 2 instructions, 0 ms elapsed, time_ms=11611555
 !!! HASH MISMATCH detected on cycle 2
-!!! PROGRAM MEMORY HASH MISMATCH on cycle 2
-Cycle 2: 2 instructions, 0 ms elapsed, time_ms=10690493
+Cycle 2: 2 instructions, 0 ms elapsed, time_ms=11612555
 !!! HASH MISMATCH detected on cycle 3
-!!! PROGRAM MEMORY HASH MISMATCH on cycle 3
-Cycle 3: 2 instructions, 0 ms elapsed, time_ms=10691493
+Cycle 3: 2 instructions, 0 ms elapsed, time_ms=11613555
 !!! HASH MISMATCH detected on cycle 4
-!!! PROGRAM MEMORY HASH MISMATCH on cycle 4
-Cycle 4: 2 instructions, 0 ms elapsed, time_ms=10692493
+Cycle 4: 2 instructions, 0 ms elapsed, time_ms=11614555
 Loaded 4 bytes from build/programs/main.bin into memory at 0x00003000
 
 === Module Map ===
@@ -43,11 +39,8 @@ Module 0: build/programs/main.bin at 0x00003000 (4 bytes)
   [build/programs/main.bin + 0x0000] 0x00020302
 Hot-reload applied from directory: build/programs
 !!! HASH MISMATCH detected on cycle 5
-!!! PROGRAM MEMORY HASH MISMATCH on cycle 5
-Cycle 5: 1 instructions, 0 ms elapsed, time_ms=10693493
+Cycle 5: 1 instructions, 0 ms elapsed, time_ms=11615555
 !!! HASH MISMATCH detected on cycle 6
-!!! PROGRAM MEMORY HASH MISMATCH on cycle 6
-Cycle 6: 1 instructions, 0 ms elapsed, time_ms=10694493
+Cycle 6: 1 instructions, 0 ms elapsed, time_ms=11616555
 !!! HASH MISMATCH detected on cycle 7
-!!! PROGRAM MEMORY HASH MISMATCH on cycle 7
-Cycle 7: 1 instructions, 0 ms elapsed, time_ms=10695493
+Cycle 7: 1 instructions, 0 ms elapsed, time_ms=11617555

@@ -573,11 +573,12 @@ void vm_update_all_register_hashes(vm_state_t *vm) {
 /* Вычислить хеш загруженной программы */
 uint32_t vm_calculate_program_hash(const vm_state_t *vm) {
     if (!vm || !vm->mem || vm->program_size == 0) return 0;
-    
+    if (vm->PC_START >= VM_MEM_BYTES) return 0;
+
     size_t hash_size = vm->program_size;
-    if (hash_size > VM_MEM_BYTES) {
-        hash_size = VM_MEM_BYTES;
+    if (hash_size > VM_MEM_BYTES - vm->PC_START) {
+        hash_size = VM_MEM_BYTES - vm->PC_START;
     }
-    
-    return crc32(vm->mem, hash_size);
+
+    return crc32(vm->mem + vm->PC_START, hash_size);
 }

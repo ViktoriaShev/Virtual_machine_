@@ -1,5 +1,5 @@
 ╔═══════════════════════════════════════════════════════════════╗
-║           VM32 Execution Log - Tue Apr 21 17:50:56 2026
+║           VM32 Execution Log - Tue Apr 21 18:06:18 2026
 ╠═══════════════════════════════════════════════════════════════╣
 ║ Memory: 67108864 bytes (64.00 MB)
 ║ Registers: 256
@@ -7,7 +7,7 @@
 ╚═══════════════════════════════════════════════════════════════╝
 
 
-=== CYCLE 1 START (time_ms=10688493) ===
+=== CYCLE 1 START (time_ms=11610555) ===
 Registers hash at start: 0xC021911A
 Initialized prev_cycle_hash = 0xC021911A
 
@@ -47,13 +47,12 @@ Initialized prev_cycle_hash = 0xC021911A
 
 INFO: Module build/programs/main.bin completed (PC=0x0)
 Module build/programs/main.bin: executed 2 instructions
-!!! PROGRAM MEMORY HASH MISMATCH
 Registers hash at end: 0xD45F9B8D
-time_ms at end: 10689493 (delta: 1000 ms)
+time_ms at end: 11611555 (delta: 1000 ms)
 VM elapsed this cycle: 0 ms
 === CYCLE 1 END: 2 instructions in 0 ms ===
 
-=== CYCLE 2 START (time_ms=10689493) ===
+=== CYCLE 2 START (time_ms=11611555) ===
 Registers hash at start: 0xD45F9B8D
 
 --- Executing module: build/programs/main.bin (0x3000) ---
@@ -93,13 +92,12 @@ Registers hash at start: 0xD45F9B8D
 INFO: Module build/programs/main.bin completed (PC=0x0)
 Module build/programs/main.bin: executed 2 instructions
 !!! HASH MISMATCH: Previous 0xD45F9B8D, current 0x1C109B91
-!!! PROGRAM MEMORY HASH MISMATCH
 Registers hash at end: 0x1C109B91
-time_ms at end: 10690493 (delta: 1000 ms)
+time_ms at end: 11612555 (delta: 1000 ms)
 VM elapsed this cycle: 0 ms
 === CYCLE 2 END: 2 instructions in 0 ms ===
 
-=== CYCLE 3 START (time_ms=10690493) ===
+=== CYCLE 3 START (time_ms=11612555) ===
 Registers hash at start: 0x1C109B91
 
 --- Executing module: build/programs/main.bin (0x3000) ---
@@ -139,13 +137,12 @@ Registers hash at start: 0x1C109B91
 INFO: Module build/programs/main.bin completed (PC=0x0)
 Module build/programs/main.bin: executed 2 instructions
 !!! HASH MISMATCH: Previous 0x1C109B91, current 0x9FB09DF4
-!!! PROGRAM MEMORY HASH MISMATCH
 Registers hash at end: 0x9FB09DF4
-time_ms at end: 10691493 (delta: 1000 ms)
+time_ms at end: 11613555 (delta: 1000 ms)
 VM elapsed this cycle: 0 ms
 === CYCLE 3 END: 2 instructions in 0 ms ===
 
-=== CYCLE 4 START (time_ms=10691493) ===
+=== CYCLE 4 START (time_ms=11613555) ===
 Registers hash at start: 0x9FB09DF4
 
 --- Executing module: build/programs/main.bin (0x3000) ---
@@ -185,13 +182,12 @@ Registers hash at start: 0x9FB09DF4
 INFO: Module build/programs/main.bin completed (PC=0x0)
 Module build/programs/main.bin: executed 2 instructions
 !!! HASH MISMATCH: Previous 0x9FB09DF4, current 0x57FF9DE8
-!!! PROGRAM MEMORY HASH MISMATCH
 Registers hash at end: 0x57FF9DE8
-time_ms at end: 10692493 (delta: 1000 ms)
+time_ms at end: 11614555 (delta: 1000 ms)
 VM elapsed this cycle: 0 ms
 === CYCLE 4 END: 2 instructions in 0 ms ===
 
-=== CYCLE 5 START (time_ms=10692493) ===
+=== CYCLE 5 START (time_ms=11614555) ===
 Registers hash at start: 0x57FF9DE8
 
 --- Executing module: build/programs/main.bin (0x3000) ---
@@ -215,13 +211,12 @@ Registers hash at start: 0x57FF9DE8
 INFO: Module build/programs/main.bin completed (PC=0x3004)
 Module build/programs/main.bin: executed 1 instructions
 !!! HASH MISMATCH: Previous 0x57FF9DE8, current 0xB74C88DA
-!!! PROGRAM MEMORY HASH MISMATCH
 Registers hash at end: 0xB74C88DA
-time_ms at end: 10693493 (delta: 1000 ms)
+time_ms at end: 11615555 (delta: 1000 ms)
 VM elapsed this cycle: 0 ms
 === CYCLE 5 END: 1 instructions in 0 ms ===
 
-=== CYCLE 6 START (time_ms=10693493) ===
+=== CYCLE 6 START (time_ms=11615555) ===
 Registers hash at start: 0xB74C88DA
 
 --- Executing module: build/programs/main.bin (0x3000) ---
@@ -245,13 +240,12 @@ Registers hash at start: 0xB74C88DA
 INFO: Module build/programs/main.bin completed (PC=0x3004)
 Module build/programs/main.bin: executed 1 instructions
 !!! HASH MISMATCH: Previous 0xB74C88DA, current 0x7F0388C6
-!!! PROGRAM MEMORY HASH MISMATCH
 Registers hash at end: 0x7F0388C6
-time_ms at end: 10694493 (delta: 1000 ms)
+time_ms at end: 11616555 (delta: 1000 ms)
 VM elapsed this cycle: 0 ms
 === CYCLE 6 END: 1 instructions in 0 ms ===
 
-=== CYCLE 7 START (time_ms=10694493) ===
+=== CYCLE 7 START (time_ms=11616555) ===
 Registers hash at start: 0x7F0388C6
 
 --- Executing module: build/programs/main.bin (0x3000) ---
@@ -275,9 +269,8 @@ Registers hash at start: 0x7F0388C6
 INFO: Module build/programs/main.bin completed (PC=0x3004)
 Module build/programs/main.bin: executed 1 instructions
 !!! HASH MISMATCH: Previous 0x7F0388C6, current 0xFCA38EA3
-!!! PROGRAM MEMORY HASH MISMATCH
 Registers hash at end: 0xFCA38EA3
-time_ms at end: 10695493 (delta: 1000 ms)
+time_ms at end: 11617555 (delta: 1000 ms)
 VM elapsed this cycle: 0 ms
 === CYCLE 7 END: 1 instructions in 0 ms ===
 
