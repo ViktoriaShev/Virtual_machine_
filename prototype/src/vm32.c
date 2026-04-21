@@ -578,23 +578,9 @@ int main(int argc, char **argv) {
         file_args_end = argc - 1;
     }
 
-    int file_count = file_args_end - 1;
-    if (file_count < 1) {
-        fprintf(stderr, "Error: no program files specified\n");
-        return 1;
-    }
-
-    const char **filenames = (const char **)malloc(sizeof(char*) * file_count);
-    if (!filenames) {
-        perror("malloc");
-        return 1;
-    }
-    for (int i = 0; i < file_count; ++i) filenames[i] = argv[1 + i];
-
     vm_state_t *vm = vm_create();
     if (!vm) {
         fprintf(stderr, "Failed to create VM\n");
-        free(filenames);
         return 1;
     }
 
@@ -626,20 +612,10 @@ int main(int argc, char **argv) {
     timers_init(vm); /* если ваша реализация требует vm, замените на timers_init(vm) */
     vm_tables_init(vm);
 
-    if (load_programs(vm, filenames, file_count) != 0) {
-        fprintf(stderr, "Failed to load programs\n");
-        vm_tables_destroy(vm);
-        vm_destroy(vm);
-        free(filenames);
-        return 1;
-    }
-
     run_program(vm);
 
     vm_tables_destroy(vm);
     vm_destroy(vm);
-    free(filenames);
-
     return 0;
 }
 #endif
