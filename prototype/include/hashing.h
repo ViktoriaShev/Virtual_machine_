@@ -37,6 +37,12 @@ typedef void *(*copy_func_t)(const void *data);
 /* Освобождение памяти */
 typedef void (*destructor_func_t)(void *data);
 
+/* Алгоритмы хеширования */
+typedef enum {
+    HASH_SIMPLE_FNV1A,
+    HASH_CRC32
+} hash_algorithm_t;
+
 /* ----------------------------
    "Интерфейсы" типов (из Главы 5)
    ---------------------------- */
@@ -89,6 +95,46 @@ typedef struct hash_table {
 /* ----------------------------
    Основные операции (API из Главы 5)
    ---------------------------- */
+
+   /* FNV-1a */
+uint32_t fnv1a32(const void *data, size_t length);
+uint32_t fnv1a32_begin(void);
+uint32_t fnv1a32_update(uint32_t hash, const void *data, size_t length);
+uint32_t fnv1a32_finalize(uint32_t hash);
+
+/* Универсальный выбор алгоритма */
+uint32_t hash_buffer(const void *data, size_t length, hash_algorithm_t algo);
+
+/* Расширенные версии */
+uint32_t calculate_registers_hash_ex(
+    const uint32_t *registers,
+    size_t count,
+    hash_algorithm_t algo
+);
+
+uint32_t calculate_memory_hash_ex(
+    const uint8_t *memory,
+    uint32_t start_addr,
+    size_t length,
+    hash_algorithm_t algo
+);
+
+uint32_t vm_calculate_registers_hash_ex(
+    const vm_state_t *vm,
+    hash_algorithm_t algo
+);
+
+uint32_t vm_calculate_memory_hash_ex(
+    const vm_state_t *vm,
+    uint32_t start_addr,
+    size_t length,
+    hash_algorithm_t algo
+);
+
+uint32_t vm_calculate_program_hash_ex(
+    const vm_state_t *vm,
+    hash_algorithm_t algo
+);
 
 /* Создать таблицу */
 hash_table_t *hash_table_create(
@@ -201,5 +247,6 @@ void vm_update_all_register_hashes(vm_state_t *vm);
 
 /* Вычислить хеш программы в памяти VM */
 uint32_t vm_calculate_program_hash(const vm_state_t *vm);
+
 
 #endif /* HASHING_H */

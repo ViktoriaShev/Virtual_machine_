@@ -18,6 +18,8 @@
 #define LOAD_FACTOR_MAX 0.5      // Увеличиваем при > 50%
 #define LOAD_FACTOR_MIN 0.125    // Уменьшаем при < 12.5%
 
+#define FNV1A32_OFFSET_BASIS 2166136261u
+#define FNV1A32_PRIME        16777619u
 /* ----------------------------
    Утилиты хеширования
    ---------------------------- */
@@ -29,6 +31,107 @@
 
 static uint32_t crc32_table[256];
 static bool crc32_initialized = false;
+
+/* ----------------------------
+   FNV-1a 32-bit
+   ---------------------------- */
+
+#define FNV1A32_OFFSET_BASIS 2166136261u
+#define FNV1A32_PRIME        16777619u
+
+uint32_t fnv1a32_begin(void) {
+    return FNV1A32_OFFSET_BASIS;
+}
+
+uint32_t fnv1a32_update(uint32_t hash, const void *data, size_t length) {
+    const uint8_t *bytes = (const uint8_t *)data;
+
+    for (size_t i = 0; i < length; i++) {
+        hash ^= bytes[i];
+        hash *= FNV1A32_PRIME;
+    }
+
+    return hash;
+}
+
+uint32_t fnv1a32_finalize(uint32_t hash) {
+    return hash;
+}
+
+uint32_t fnv1a32(const void *data, size_t length) {
+    uint32_t h = fnv1a32_begin();
+    h = fnv1a32_update(h, data, length);
+    return fnv1a32_finalize(h);
+}
+
+uint32_t hash_buffer(const void *data, size_t length, hash_algorithm_t algo) {
+    switch (algo) {
+        case HASH_CRC32:
+            return crc32(data, length);
+        case HASH_SIMPLE_FNV1A:
+            return fnv1a32(data, length);
+        default:
+            return crc32(data, length);
+    }
+}
+
+uint32_t calculate_registers_hash_ex(
+    const uint32_t *registers,
+    size_t count,
+    hash_algorithm_t algo
+) {
+    if (!registers) return 0;
+    return hash_buffer(registers, count * sizeof(uint32_t), algo);
+}
+
+uint32_t calculate_memory_hash_ex(
+    const uint8_t *memory,
+    uint32_t start_addr,
+    size_t length,
+    hash_algorithm_t algo
+) {
+    if (!memory) return 0;
+    return hash_buffer(memory + start_addr, length, algo);
+}
+
+uint32_t vm_calculate_registers_hash_ex(
+    const vm_state_t *vm,
+    hash_algorithm_t algo
+) {
+    if (!vm) return 0;
+    return hash_buffer(vm->reg, REG_COUNT * sizeof(uint32_t), algo);
+}
+
+uint32_t vm_calculate_memory_hash_ex(
+    const vm_state_t *vm,
+    uint32_t start_addr,
+    size_t length,
+    hash_algorithm_t algo
+) {
+    if (!vm || !vm->mem) return 0;
+    if (start_addr >= VM_MEM_BYTES) return 0;
+
+    if (start_addr + length > VM_MEM_BYTES) {
+        length = VM_MEM_BYTES - start_addr;
+    }
+
+    return hash_buffer(vm->mem + start_addr, length, algo);
+}
+
+uint32_t vm_calculate_program_hash_ex(
+    const vm_state_t *vm,
+    hash_algorithm_t algo
+) {
+    if (!vm || !vm->mem || vm->program_size == 0) return 0;
+    if (vm->PC_START >= VM_MEM_BYTES) return 0;
+
+    size_t hash_size = vm->program_size;
+    if (hash_size > VM_MEM_BYTES - vm->PC_START) {
+        hash_size = VM_MEM_BYTES - vm->PC_START;
+    }
+
+    return hash_buffer(vm->mem + vm->PC_START, hash_size, algo);
+}
 
 static void crc32_init_table(void) {
     const uint32_t polynomial = 0xEDB88320; // Reflected

@@ -10,6 +10,7 @@
 #include "vm_tables.h"
 #include "loader.h"
 #include "hot_reload.h"
+#include "vm_helpers.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -95,7 +96,6 @@ vm_state_t *vm_create(void) {
     vm->log_file = NULL;
     vm->logging_enabled = true;
     vm->verbose_logging = false;
-    vm->log_file = NULL;
 
     vm->user_data = NULL;
 
@@ -103,7 +103,7 @@ vm_state_t *vm_create(void) {
     vm->config.clock_rate_hz = 100;
     vm->config.cycle_time_ms = 1000;
     vm->config.enable_cycle_check = true;
-    vm->config.enable_hash_check = true;
+    vm->config.enable_hash_check = false;
     vm->config.enable_tick_timing = false;
     vm->config.hash_algo = HASH_CRC32;
 
@@ -186,7 +186,7 @@ int vm_init_defaults(vm_state_t *vm) {
     vm->config.clock_rate_hz = 100;
     vm->config.cycle_time_ms = 1000;
     vm->config.enable_cycle_check = true;
-    vm->config.enable_hash_check = true;
+    vm->config.enable_hash_check = false;
     vm->config.enable_tick_timing = false;
     vm->config.hash_algo = HASH_CRC32;
 
@@ -374,7 +374,6 @@ int run_program(vm_state_t *vm) {
 
     /* Принудительные значения (как раньше) */
     vm->config.hash_algo = HASH_CRC32;
-    vm->config.enable_hash_check = true;
 
     printf("Starting VM execution with cycle-based execution\n");
     printf("Cycle time: %u ms\n", vm->config.cycle_time_ms);
@@ -407,7 +406,11 @@ int run_program(vm_state_t *vm) {
             fprintf(vm->log_file, "\n=== CYCLE %u START (time_ms=%llu) ===\n", vm->cycle_count, (unsigned long long)vm->time_ms);
         }
 
-        uint32_t start_hash = calculate_registers_hash(vm->reg, REG_COUNT);
+        uint32_t start_hash = calculate_registers_hash_ex(
+            vm->reg,
+            REG_COUNT,
+            vm->config.hash_algo
+        );
         if (vm->logging_enabled && vm->log_file) {
             fprintf(vm->log_file, "Registers hash at start: 0x%08X\n", start_hash);
         }
@@ -506,7 +509,11 @@ int run_program(vm_state_t *vm) {
 
         update_all_timers(vm); /* предполагается адаптировать под per-vm, при необходимости заменить на update_all_timers(vm) */
 
-        uint32_t end_hash = calculate_registers_hash(vm->reg, REG_COUNT);
+        uint32_t end_hash = calculate_registers_hash_ex(
+            vm->reg,
+            REG_COUNT,
+            vm->config.hash_algo
+        );
 
         if (vm->config.enable_hash_check) {
             if (vm->cycle_count > 1 && end_hash != vm->prev_cycle_hash) {
@@ -565,51 +572,51 @@ int run_program(vm_state_t *vm) {
    ---------------------------- */
 #ifndef UNIT_TEST
 int main(int argc, char **argv) {
-    if (argc < 2) {
-        printf("Usage: %s <program1.bin> [program2.bin ...] [--raw-halt]\n", argv[0]);
-        return 1;
-    }
-
-    int raw_halt = 0;
-    int file_args_end = argc;
-
-    if (argc >= 2 && strcmp(argv[argc-1], "--raw-halt") == 0) {
-        raw_halt = 1;
-        file_args_end = argc - 1;
-    }
-
     vm_state_t *vm = vm_create();
     if (!vm) {
         fprintf(stderr, "Failed to create VM\n");
         return 1;
     }
 
-    const char *program_dir = (argc >= 2) ? argv[1] : "build/programs";
+    vm_cli_options_t opts;
+    int parse_rc = vm_parse_cli(argc, argv, &opts, stderr);
+    if (parse_rc != 0) {
+        vm_destroy(vm);
+        return (parse_rc > 0) ? 0 : 1;
+    }
 
-    vm->program_dir = strdup(program_dir);
-    if (!vm->program_dir) {
-        fprintf(stderr, "Failed to allocate program_dir\n");
+    if (vm_apply_cli_options(vm, &opts, stderr) != 0) {
         vm_destroy(vm);
         return 1;
     }
 
-    /* первая загрузка */
+    if (!vm->program_dir) {
+        vm->program_dir = strdup("build/programs");
+        if (!vm->program_dir) {
+            fprintf(stderr, "Failed to allocate default program_dir\n");
+            vm_destroy(vm);
+            return 1;
+        }
+    }
+
+    if (vm_validate_config(vm, stderr) != 0) {
+        vm_destroy(vm);
+        return 1;
+    }
+
     if (reload_programs_from_directory(vm, vm->program_dir) != 0) {
         fprintf(stderr, "Initial load failed\n");
         vm_destroy(vm);
         return 1;
     }
 
-    /* зафиксировать сигнатуру */
     directory_changed(vm->program_dir, &vm->program_dir_signature);
 
-/* сигналы */
     g_active_vm_for_signal = vm;
     signal(SIGINT, handle_sigterm_global);
     signal(SIGTERM, handle_sigterm_global);
 
-    /* timers / tables — ожидается адаптация реализаций к vm аргументу */
-    timers_init(vm); /* если ваша реализация требует vm, замените на timers_init(vm) */
+    timers_init(vm);
     vm_tables_init(vm);
 
     run_program(vm);

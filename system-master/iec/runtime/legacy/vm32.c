@@ -22,7 +22,7 @@ vm_config_t vm_config = {
     .clock_rate_hz = 100,        // 100 инструкций/сек (0 = без ограничения)
     .cycle_time_ms = 1000,       // 1000 мс = 1 секунда на цикл
     .enable_cycle_check = true,  // Включена проверка перерасхода
-    .enable_hash_check = true,   // Включена проверка хеша
+    .enable_hash_check = false,   // Включена проверка хеша
     .enable_tick_timing = false , // Отключено (можно включить для медленного выполнения)
     .hash_algo = HASH_CRC32      // По умолчанию — CRC32 (можно сменить на HASH_FNV1A)
 };

@@ -4,6 +4,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "timers.h"
+#include "hashing.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -25,12 +26,6 @@
 #endif
 
 typedef struct hash_table hash_table_t;
-
-/* Хеш-алгоритм */
-typedef enum {
-    HASH_SIMPLE_FNV1A,
-    HASH_CRC32
-} hash_algorithm_t;
 
 /* Конфигурация VM */
 typedef struct {
