@@ -37,7 +37,7 @@ TEST_BIN_DIR := $(BUILD_DIR)/tests
 # =========================================================
 # Flags
 # =========================================================
-CFLAGS  := -std=c11 -O2 -Wall -Wextra -I$(INC_DIR)
+CFLAGS  := -std=c11 -O2 -Wall -Wextra -I$(INC_DIR) -I$(TEST_DIR)
 LDFLAGS :=
 LDLIBS  := -lm -latomic
 
@@ -144,10 +144,12 @@ hot_reload_test: $(HOT_RELOAD_BIN)
 # =========================================================
 # Unit tests
 # =========================================================
-TEST_SRCS := $(wildcard $(TEST_DIR)/*.c)
+ALL_TEST_SRCS := $(shell find $(TEST_DIR) -type f -name "*.c")
+TEST_SRCS := $(filter-out $(TEST_DIR)/hot_reload_test.c,$(ALL_TEST_SRCS))
 TEST_BINS := $(patsubst $(TEST_DIR)/%.c,$(TEST_BIN_DIR)/%,$(TEST_SRCS))
 
 $(TEST_BIN_DIR)/%: $(TEST_DIR)/%.c $(VM_CORE_OBJS) | dirs
+	@mkdir -p $(dir $@)
 	$(HOST_CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
 test: $(TEST_BINS)
