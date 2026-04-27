@@ -8,7 +8,43 @@
 #include <getopt.h>
 #include <sys/stat.h>
 #include <ctype.h>
-#include <strings.h> 
+#include <strings.h>
+#include <limits.h>
+
+/* ----------------------------
+   Вспомогательные функции времени — инстансные
+   ---------------------------- */
+void vm_init_timer(vm_state_t *vm) {
+    if (!vm) return;
+    clock_gettime(CLOCK_MONOTONIC, &vm->last_tick_time);
+}
+
+long vm_get_elapsed_ms(struct timespec start, struct timespec end) {
+    return (end.tv_sec - start.tv_sec) * 1000L +
+           (end.tv_nsec - start.tv_nsec) / 1000000L;
+}
+
+void vm_wait_for_tick(vm_state_t *vm) {
+    if (!vm) return;
+    if (!vm->config.enable_tick_timing || vm->config.clock_rate_hz == 0) {
+        return;
+    }
+
+    struct timespec current_time;
+    clock_gettime(CLOCK_MONOTONIC, &current_time);
+
+    long interval_ns = 1000000000L / (long)vm->config.clock_rate_hz;
+    long elapsed_ns = (current_time.tv_sec - vm->last_tick_time.tv_sec) * 1000000000L +
+                      (current_time.tv_nsec - vm->last_tick_time.tv_nsec);
+
+    if (elapsed_ns < interval_ns) {
+        long remaining_ns = interval_ns - elapsed_ns;
+        struct timespec sleep_time = {0, remaining_ns};
+        nanosleep(&sleep_time, NULL);
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &vm->last_tick_time);
+}
 
 /* ----------------------------
    Вспомогательные функции парсинга
@@ -71,6 +107,8 @@ static int path_is_directory(const char *path) {
 }
 
 static void print_usage(FILE *out, const char *progname) {
+    if (!out) out = stderr;
+
     fprintf(out,
         "Usage: %s <program_dir> [options]\n"
         "\n"
@@ -85,7 +123,7 @@ static void print_usage(FILE *out, const char *progname) {
         "  --disable-tick-timing     Disable tick timing\n"
         "  --hash-algo crc32|fnv1a   Select hash algorithm\n"
         "  -h, --help                Show this help\n",
-        progname
+        progname ? progname : "vm"
     );
 }
 
@@ -106,6 +144,19 @@ const char *hash_algorithm_to_string(hash_algorithm_t algo) {
     }
 }
 
+void vm_print_config(const vm_state_t *vm, FILE *out) {
+    if (!vm) return;
+    if (!out) out = stdout;
+
+    fprintf(out, "program_dir: %s\n", vm->program_dir ? vm->program_dir : "(null)");
+    fprintf(out, "clock_rate_hz: %u\n", vm->config.clock_rate_hz);
+    fprintf(out, "cycle_time_ms: %u\n", vm->config.cycle_time_ms);
+    fprintf(out, "enable_cycle_check: %s\n", vm->config.enable_cycle_check ? "true" : "false");
+    fprintf(out, "enable_hash_check: %s\n", vm->config.enable_hash_check ? "true" : "false");
+    fprintf(out, "enable_tick_timing: %s\n", vm->config.enable_tick_timing ? "true" : "false");
+    fprintf(out, "hash_algo: %s\n", hash_algorithm_to_string(vm->config.hash_algo));
+}
+
 int vm_parse_cli(
     int argc,
     char **argv,
@@ -113,6 +164,7 @@ int vm_parse_cli(
     FILE *err
 ) {
     if (!opts) return -1;
+    if (!err) err = stderr;
 
     vm_cli_options_init(opts);
 
@@ -219,6 +271,7 @@ int vm_parse_cli(
 
 int vm_validate_config(const vm_state_t *vm, FILE *err) {
     if (!vm) return -1;
+    if (!err) err = stderr;
 
     if (!vm->program_dir || vm->program_dir[0] == '\0') {
         fprintf(err, "Program directory is not set\n");
@@ -255,6 +308,7 @@ int vm_apply_cli_options(
     FILE *err
 ) {
     if (!vm || !opts) return -1;
+    if (!err) err = stderr;
 
     if (opts->program_dir) {
         free(vm->program_dir);

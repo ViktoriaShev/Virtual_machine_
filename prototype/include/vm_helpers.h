@@ -1,10 +1,12 @@
 #ifndef VM_HELPERS_H
 #define VM_HELPERS_H
 
-#include "vm32.h"
+#include "main.h"
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <time.h>
 
 typedef struct {
     const char *program_dir;
@@ -29,6 +31,10 @@ typedef struct {
 } vm_cli_options_t;
 
 void vm_cli_options_init(vm_cli_options_t *opts);
+
+void vm_init_timer(vm_state_t *vm);
+long vm_get_elapsed_ms(struct timespec start, struct timespec end);
+void vm_wait_for_tick(vm_state_t *vm);
 
 int vm_parse_cli(
     int argc,

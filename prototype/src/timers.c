@@ -1,5 +1,5 @@
 #include "timers.h"
-#include "vm32.h"
+#include "main.h"
 #include <string.h>
 
 static inline uint32_t ms_diff(struct timespec *a, struct timespec *b) {

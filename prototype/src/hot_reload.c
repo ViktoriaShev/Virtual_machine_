@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "hot_reload.h"
-#include "vm32.h"
+#include "main.h"
 #include "loader.h"
 #include "hashing.h"
 

@@ -23,15 +23,16 @@ endif
 # =========================================================
 # Directories
 # =========================================================
-SRC_DIR     := src
-INC_DIR     := include
-ASM_DIR     := asm
-TOOLS_DIR   := tools
-TEST_DIR    := tests
+SRC_DIR   := src
+INC_DIR   := include
+ASM_DIR   := asm
+TOOLS_DIR := tools
+TEST_DIR  := tests
 
-BUILD_DIR   := build
-OBJ_DIR     := $(BUILD_DIR)/obj
-BIN_DIR     := $(BUILD_DIR)/bin
+BUILD_DIR := build
+OBJ_DIR   := $(BUILD_DIR)/obj
+BIN_DIR   := $(BUILD_DIR)/bin
+TEST_BIN_DIR := $(BUILD_DIR)/tests
 
 # =========================================================
 # Flags
@@ -45,19 +46,32 @@ LDLIBS  := -lm -latomic
 # =========================================================
 VM_SRCS := $(wildcard $(SRC_DIR)/*.c)
 
-# Core VM (без main)
-VM_CORE_OBJS := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/core_%.o,$(VM_SRCS))
+# --- разделяем main ---
+MAIN_SRC := $(SRC_DIR)/main.c
+VM_CORE_SRCS := $(filter-out $(MAIN_SRC), $(VM_SRCS))
 
+# =========================================================
+# Objects
+# =========================================================
+VM_CORE_OBJS := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/core_%.o,$(VM_CORE_SRCS))
+MAIN_OBJ     := $(OBJ_DIR)/main.o
+
+# =========================================================
 # Converter
+# =========================================================
 CONVERTER_SRC := $(TOOLS_DIR)/converter.c
 CONVERTER_OBJ := $(OBJ_DIR)/converter.o
 CONVERTER_BIN := $(BUILD_DIR)/converter
 
+# =========================================================
 # ASM → BIN
+# =========================================================
 ASM_SRCS  := $(wildcard $(ASM_DIR)/*.asm)
 BIN_FILES := $(patsubst $(ASM_DIR)/%.asm,$(BIN_DIR)/%.bin,$(ASM_SRCS))
 
+# =========================================================
 # Targets
+# =========================================================
 VM_BIN := $(BUILD_DIR)/vm32_$(SUFFIX)
 HOT_RELOAD_BIN := $(BIN_DIR)/hot_reload_test
 
@@ -70,13 +84,25 @@ all: dirs $(CONVERTER_BIN) $(VM_BIN)
 # Directories
 # =========================================================
 dirs:
-	mkdir -p $(BUILD_DIR) $(OBJ_DIR) $(BIN_DIR)
+	mkdir -p $(BUILD_DIR) $(OBJ_DIR) $(BIN_DIR) $(TEST_BIN_DIR)
 
 # =========================================================
 # Core VM (без main)
 # =========================================================
 $(OBJ_DIR)/core_%.o: $(SRC_DIR)/%.c | dirs
 	$(CC) $(CFLAGS) -DVM_NO_MAIN -c $< -o $@
+
+# =========================================================
+# Main (CLI)
+# =========================================================
+$(MAIN_OBJ): $(MAIN_SRC) | dirs
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# =========================================================
+# VM binary
+# =========================================================
+$(VM_BIN): $(VM_CORE_OBJS) $(MAIN_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 # =========================================================
 # Converter
@@ -86,12 +112,6 @@ $(CONVERTER_BIN): $(CONVERTER_OBJ)
 
 $(OBJ_DIR)/converter.o: $(CONVERTER_SRC) | dirs
 	$(HOST_CC) $(CFLAGS) -c $< -o $@
-
-# =========================================================
-# VM CLI (с main)
-# =========================================================
-$(VM_BIN): $(VM_CORE_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 # =========================================================
 # ASM → BIN
@@ -112,8 +132,9 @@ ifeq ($(TARGET),host)
 else
 	@echo "Copy $(VM_BIN) to device"
 endif
+
 # =========================================================
-# HOT RELOAD TEST
+# Hot reload test
 # =========================================================
 $(HOT_RELOAD_BIN): $(VM_CORE_OBJS) $(TEST_DIR)/hot_reload_test.c | dirs
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
@@ -121,13 +142,12 @@ $(HOT_RELOAD_BIN): $(VM_CORE_OBJS) $(TEST_DIR)/hot_reload_test.c | dirs
 hot_reload_test: $(HOT_RELOAD_BIN)
 
 # =========================================================
-# Unit Tests (auto)
+# Unit tests
 # =========================================================
 TEST_SRCS := $(wildcard $(TEST_DIR)/*.c)
-TEST_BINS := $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/tests/%,$(TEST_SRCS))
+TEST_BINS := $(patsubst $(TEST_DIR)/%.c,$(TEST_BIN_DIR)/%,$(TEST_SRCS))
 
-$(BUILD_DIR)/tests/%: $(TEST_DIR)/%.c $(VM_CORE_OBJS) | dirs
-	mkdir -p $(BUILD_DIR)/tests
+$(TEST_BIN_DIR)/%: $(TEST_DIR)/%.c $(VM_CORE_OBJS) | dirs
 	$(HOST_CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
 test: $(TEST_BINS)

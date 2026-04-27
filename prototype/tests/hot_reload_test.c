@@ -7,7 +7,10 @@
 #include <unistd.h>
 #include <time.h>
 
-#include "vm32.h"
+#include "main.h"
+#include "vm_lifecycle.h"
+#include "vm_runtime.h"
+#include "loader.h"
 
 static volatile sig_atomic_t reload_requested = 0;
 static volatile sig_atomic_t running = 1;

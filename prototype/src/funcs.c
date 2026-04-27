@@ -1,5 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
-#include "vm32.h"
+#include "main.h"
 #include "funcs.h"
 #include "timers.h"
 #include <string.h>
