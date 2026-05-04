@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include <string>
-#include "./legacy/include/vm32_api.h"
+#include "./legacy/include/vm_api.h"
 
 namespace system_runtime {
 

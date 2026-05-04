@@ -5,13 +5,12 @@
 extern "C" {
 #endif
 
+#include "main.h"
 /* log levels для мостов */
 #define VM32_LOG_INFO  0
 #define VM32_LOG_ERROR 1
 #define VM32_LOG_DEBUG 2
 
-
-#include "vm32.h" /* vm_config_t, REG_COUNT и т.д. */
 
 /* Инициализация VM (выделение памяти, init timers/tables и т.д.)
    Передаём NULL, чтобы использовать vm_config (дефолт) */
