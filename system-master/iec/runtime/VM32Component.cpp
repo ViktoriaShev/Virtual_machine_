@@ -1,7 +1,8 @@
 #include "VM32Component.h"
-#include "../bus/SystemBus.h"
-#include "../task/TaskManager.h"
-#include "logger_bridge.cpp"
+#include "../../bus/SystemBus.h"
+#include "../../core/task/TaskManager.h"
+#include "../../core/interfaces/ILogger.h"
+#include "logger_bridge.h"
 #include <iostream>
 #include <memory>
 
@@ -33,7 +34,7 @@ namespace system_runtime {
             std::cerr << "VM32Component: SystemBus not set\n";
             return false;
         }
-        auto sysLogPtr = bus_->getService<ISystemLog>();
+        auto sysLogPtr = bus_->getService<ILogger>();
         if (!sysLogPtr) {
             std::cerr << "VM32Component: ISystemLog not available\n";
         } else {
