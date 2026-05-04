@@ -5,6 +5,7 @@
 
 #include "VM32Engine.h"
 #include "../../core/interfaces/IComponent.h"
+#include "../../core/interfaces/ITickable.h"
 
 namespace system_runtime {
 

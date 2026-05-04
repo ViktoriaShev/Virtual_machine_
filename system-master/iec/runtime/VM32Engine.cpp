@@ -2,6 +2,8 @@
 #include <vector>
 #include <cstring>
 
+namespace system_runtime {
+
 VM32Engine::VM32Engine(): initialized_(false) {}
 VM32Engine::~VM32Engine() { if (initialized_) shutdown(); }
 
@@ -27,3 +29,5 @@ bool VM32Engine::loadPrograms(const std::vector<std::string> &programFiles) {
 void VM32Engine::executeCycle() { vm32_execute_cycle(); }
 void VM32Engine::shutdown() { vm32_shutdown(); initialized_ = false; }
 void VM32Engine::requestStop() { vm32_request_stop(); }
+
+}

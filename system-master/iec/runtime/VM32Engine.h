@@ -3,6 +3,8 @@
 #include <string>
 #include "./legacy/include/vm32_api.h"
 
+namespace system_runtime {
+
 class VM32Engine {
 public:
     VM32Engine();
@@ -18,3 +20,5 @@ public:
 private:
     bool initialized_;
 };
+
+}
