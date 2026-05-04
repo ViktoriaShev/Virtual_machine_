@@ -1,7 +1,7 @@
 // loader.c
 #define _POSIX_C_SOURCE 200809L
 
-#include "vm32.h"
+#include "main.h"
 #include "hashing.h"   /* calculate_memory_hash(vm->mem, ...) */
 #include "debug.h"     /* opcode_name() если нужно */
 
@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <signal.h>
 
 int load_programs(vm_state_t *vm, const char **fnames, int count) {
     if (!vm || count <= 0) {

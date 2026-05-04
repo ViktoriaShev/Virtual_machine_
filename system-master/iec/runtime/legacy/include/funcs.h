@@ -1,7 +1,7 @@
 #ifndef FUNCS_H
 #define FUNCS_H
 
-#include "vm32.h"
+#include "main.h"
 #include <time.h>
 #include <stdint.h>
 #include <stdbool.h>

@@ -2,7 +2,7 @@
 #ifndef LOADER_H
 #define LOADER_H
 
-#include "vm32.h"
+#include "main.h"
 
 /* Загружает бинарники в память VM.
    Заполняет vm->modules, vm->module_count, vm->program_hash, vm->program_size.

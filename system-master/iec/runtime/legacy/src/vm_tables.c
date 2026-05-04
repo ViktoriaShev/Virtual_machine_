@@ -1,7 +1,7 @@
 // vm_tables.c
 #define _POSIX_C_SOURCE 200809L
 
-#include "vm32.h"
+#include "main.h"
 #include "vm_tables.h"
 #include "hashing.h"   /* предполагает, что тут определены hash_table_* и key/value types */
 #include "funcs.h"
@@ -12,18 +12,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/*
-  Переписанный под vm_state_t вариант.
-  API:
-    int vm_tables_init(vm_state_t *vm);
-    void vm_tables_destroy(vm_state_t *vm);
-    void labels_add(vm_state_t *vm, const char *name, uint32_t addr);
-    uint32_t *labels_lookup(vm_state_t *vm, const char *name);
-    void bp_set(vm_state_t *vm, uint32_t addr);
-    void bp_clear(vm_state_t *vm, uint32_t addr);
-    bool bp_is_set(vm_state_t *vm, uint32_t addr);
-    decoded_instr_t *vm_decode_instruction(vm_state_t *vm, uint32_t addr);
-*/
 
 int vm_tables_init(vm_state_t *vm) {
     if (!vm) return -1;

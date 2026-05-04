@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "vm32.h"
+#include "main.h"
 
 #define NUM_REGS REG_COUNT
 #define MEM_LOG_SIZE 256
