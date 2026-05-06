@@ -69,12 +69,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Руководство по запуску виртуальной машины.md",
+                "file": "Без названия.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Руководство по запуску виртуальной машины"
+              "title": "Без названия"
             }
           }
         ],
@@ -228,8 +228,9 @@
   },
   "active": "095d7c6efe983f3f",
   "lastOpenFiles": [
-    "Таблица operational codes.md",
     "Руководство по запуску виртуальной машины.md",
+    "Без названия.md",
+    "Таблица operational codes.md",
     "Режим immediate.md",
     "Приложение - Хеширование в проекте VM32**.md",
     "Приложение - как считать.md",

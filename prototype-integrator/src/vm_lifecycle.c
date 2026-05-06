@@ -65,7 +65,9 @@ static void vm_state_init_registers(vm_state_t *vm) {
 static void vm_state_clear_iec_state(vm_state_t *vm) {
     if (!vm) return;
 
-    memset(vm->edge_prev_input, 0, sizeof(vm->edge_prev_input));
+    memset(vm->edge_prev_rising, 0, sizeof(vm->edge_prev_rising));
+    memset(vm->edge_prev_falling, 0, sizeof(vm->edge_prev_falling));
+    memset(vm->edge_prev_both, 0, sizeof(vm->edge_prev_both));
     memset(vm->rs_latches, 0, sizeof(vm->rs_latches));
     memset(vm->sr_latches, 0, sizeof(vm->sr_latches));
 
@@ -175,6 +177,9 @@ static void vm_state_reset_runtime(vm_state_t *vm) {
     vm->dbg_instruction_count = 0;
     memset(vm->dbg_prev_reg, 0, sizeof(vm->dbg_prev_reg));
     memset(vm->dbg_prev_mem, 0, sizeof(vm->dbg_prev_mem));
+    memset(vm->edge_prev_rising, 0, sizeof(vm->edge_prev_rising));
+    memset(vm->edge_prev_falling, 0, sizeof(vm->edge_prev_falling));
+    memset(vm->edge_prev_both, 0, sizeof(vm->edge_prev_both));
 
     clock_gettime(CLOCK_MONOTONIC, &vm->last_tick_time);
 }

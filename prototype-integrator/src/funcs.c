@@ -488,9 +488,9 @@ void op_rising_edge(vm_state_t *vm, uint32_t i) {
     if (id < 0 || id >= MAX_TIMERS) { SetA_val(vm, i, 0); return; }
 
     bool in = Bv(vm, i) != 0;
-    bool prev = vm->edge_prev_input[id];
+    bool prev = vm->edge_prev_rising[id];
     bool rising = in && !prev;
-    vm->edge_prev_input[id] = in;
+    vm->edge_prev_rising[id] = in;
     SetA_val(vm, i, rising ? 1 : 0);
 }
 
@@ -505,9 +505,9 @@ void op_falling_edge(vm_state_t *vm, uint32_t i) {
     if (id < 0 || id >= MAX_TIMERS) { SetA_val(vm, i, 0); return; }
 
     bool in = Bv(vm, i) != 0;
-    bool prev = vm->edge_prev_input[id];
+    bool prev = vm->edge_prev_falling[id];
     bool falling = !in && prev;
-    vm->edge_prev_input[id] = in;
+    vm->edge_prev_falling[id] = in;
     SetA_val(vm, i, falling ? 1 : 0);
 }
 
@@ -522,9 +522,9 @@ void op_edge_both(vm_state_t *vm, uint32_t i) {
     if (id < 0 || id >= MAX_TIMERS) { SetA_val(vm, i, 0); return; }
 
     bool in = Bv(vm, i) != 0;
-    bool prev = vm->edge_prev_input[id];
+    bool prev = vm->edge_prev_both[id];
     bool changed = (in != prev);
-    vm->edge_prev_input[id] = in;
+    vm->edge_prev_both[id] = in;
     SetA_val(vm, i, changed ? 1 : 0);
 }
 
@@ -543,13 +543,12 @@ void op_edge_both(vm_state_t *vm, uint32_t i) {
 
 /* RS latch: Reset has priority (if R==1 => Q=0, else if S==1 => Q=1, else keep) */
 void op_rs_latch(vm_state_t *vm, uint32_t i) {
-    int id = -1;
-    if (FIMM(i)) {
-        id = (int)IMM8(i);
-    } else {
-        id = (int)vm->reg[RA(i)];
+    int id = FIMM(i) ? (int)IMM8(i) : (int)RA(i);
+
+    if (id < 0 || id >= MAX_TIMERS) {
+        SetA_val(vm, i, 0);
+        return;
     }
-    if (id < 0 || id >= MAX_TIMERS) { SetA_val(vm, i, 0); return; }
 
     bool S = vm->reg[RB(i)] != 0;
     bool R = vm->reg[RC(i)] != 0;
@@ -559,18 +558,18 @@ void op_rs_latch(vm_state_t *vm, uint32_t i) {
     } else if (S) {
         vm->rs_latches[id] = true;
     }
+
     SetA_val(vm, i, vm->rs_latches[id] ? 1 : 0);
 }
 
 /* SR latch: Set has priority (if S==1 => Q=1, else if R==1 => Q=0, else keep) */
 void op_sr_latch(vm_state_t *vm, uint32_t i) {
-    int id = -1;
-    if (FIMM(i)) {
-        id = (int)IMM8(i);
-    } else {
-        id = (int)vm->reg[RA(i)];
+    int id = FIMM(i) ? (int)IMM8(i) : (int)RA(i);
+
+    if (id < 0 || id >= MAX_TIMERS) {
+        SetA_val(vm, i, 0);
+        return;
     }
-    if (id < 0 || id >= MAX_TIMERS) { SetA_val(vm, i, 0); return; }
 
     bool S = vm->reg[RB(i)] != 0;
     bool R = vm->reg[RC(i)] != 0;
@@ -580,6 +579,7 @@ void op_sr_latch(vm_state_t *vm, uint32_t i) {
     } else if (R) {
         vm->sr_latches[id] = false;
     }
+
     SetA_val(vm, i, vm->sr_latches[id] ? 1 : 0);
 }
 
@@ -631,15 +631,7 @@ void op_nop(vm_state_t *vm, uint32_t i) {
 }
 
 void op_exit(vm_state_t *vm, uint32_t i) {
-    int code = 0;
-    
-    if (Av(vm, i) == 0) {
-        code = (int)IMM8(i);
-    } else {
-        code = (int)A(i);
-    }
-
-    vm->exit_code = code;
+    vm->exit_code = FIMM(i) ? (int)IMM8(i) : (int)A(i);
     vm->running = false;
     atomic_store(&vm->stop_requested, true);
 }

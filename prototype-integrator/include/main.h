@@ -155,9 +155,11 @@ typedef struct vm_state {
     bool ctd_prev_input[MAX_TIMERS];
     bool ctud_prev_up[MAX_TIMERS];
     bool ctud_prev_down[MAX_TIMERS];
-
+    
     /* generic edges */
-    bool edge_prev_input[MAX_TIMERS];
+    bool edge_prev_rising[MAX_TIMERS];
+    bool edge_prev_falling[MAX_TIMERS];
+    bool edge_prev_both[MAX_TIMERS];
 
     /* latches */
     bool rs_latches[MAX_TIMERS];
