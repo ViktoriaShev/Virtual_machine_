@@ -170,8 +170,14 @@ coverage: clean test
 
 coverage-report:
 	lcov --capture --directory $(BUILD_DIR) --output-file $(BUILD_DIR)/coverage.info
-	genhtml $(BUILD_DIR)/coverage.info --output-directory $(BUILD_DIR)/coverage
+	genhtml $(BUILD_DIR)/coverage.info --output-directory $(BUILD_DIR)/coverage --legend --title "VM Coverage"
 
+coverage-summary:
+	lcov --summary $(BUILD_DIR)/coverage.info
+
+coverage-open: coverage-report
+	xdg-open $(BUILD_DIR)/coverage/index.html
+	
 # =========================================================
 # Clean
 # =========================================================

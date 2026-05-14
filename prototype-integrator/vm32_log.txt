@@ -1,5 +1,5 @@
 ╔═══════════════════════════════════════════════════════════════╗
-║           VM32 Execution Log - Mon Apr 27 14:31:14 2026
+║           VM32 Execution Log - Tue May 12 16:11:32 2026
 ╠═══════════════════════════════════════════════════════════════╣
 ║ Memory: 67108864 bytes (64.00 MB)
 ║ Registers: 256
@@ -7,22 +7,22 @@
 ╚═══════════════════════════════════════════════════════════════╝
 
 
-=== CYCLE 1 START (time_ms=12940198) ===
+=== CYCLE 1 START (time_ms=15432041) ===
 Registers hash at start: 0xC021911A
 
---- Executing module: build/programs/main.bin (0x3000) ---
+--- Executing module: build/bin/control.bin (0x3000) ---
 ┌─ Instruction #1 ─────────────────────────────────────────
 │ PC: 0x00003000
-│ ADD        R1, R1, #1  [0x00020301]
-│ Binary: 00000000 00000010 00000011 00000001
+│ SUB        R3, R3, #5  [0x02060705]
+│ Binary: 00000010 00000110 00000111 00000101
 │
 │ Operands BEFORE:
-│   R1 (A) = 0x00000003 (         3)
-│   R1 (B) = 0x00000003 (         3)
-│   C (immediate) = #1 (raw=0x01)
+│   R3 (A) = 0x00000000 (         0)
+│   R3 (B) = 0x00000000 (         0)
+│   C (immediate) = #5 (raw=0x05)
 │
 │ Register CHANGES:
-│   R001: 0x00000003 -> 0x00000004
+│   R003: 0x00000000 -> 0xFFFFFFFB
 │ Memory changes: (none)
 │
 │ PC changed: 0x00003000 -> 0x00003004
@@ -30,8 +30,8 @@ Registers hash at start: 0xC021911A
 
 ┌─ Instruction #2 ─────────────────────────────────────────
 │ PC: 0x00003004
-│ JMP        R0, R0, #0  [0x7C000100]
-│ Binary: 01111100 00000000 00000001 00000000
+│ EXIT       R0, R0, #0  [0x82000100]
+│ Binary: 10000010 00000000 00000001 00000000
 │
 │ Operands BEFORE:
 │   R0 (A) = 0x00000005 (         5)
@@ -41,41 +41,50 @@ Registers hash at start: 0xC021911A
 │ Register changes: (none)
 │ Memory changes: (none)
 │
-│ PC changed: 0x00003004 -> 0x00000000
+│ PC changed: 0x00003004 -> 0x00003008
 └──────────────────────────────────────────────────────────────
 
-INFO: Module build/programs/main.bin completed (PC=0x0)
-Module build/programs/main.bin: executed 2 instructions
-Registers hash at end: 0xD45F9B8D
-time_ms at end: 12941198 (delta: 1000 ms)
-VM elapsed this cycle: 0 ms
-=== CYCLE 1 END: 2 instructions in 0 ms ===
+Module build/bin/control.bin: executed 2 instructions
 
-=== CYCLE 2 START (time_ms=12941198) ===
-Registers hash at start: 0xD45F9B8D
-
---- Executing module: build/programs/main.bin (0x3000) ---
+--- Executing module: build/bin/io.bin (0x3008) ---
 ┌─ Instruction #3 ─────────────────────────────────────────
-│ PC: 0x00003000
-│ ADD        R1, R1, #1  [0x00020301]
-│ Binary: 00000000 00000010 00000011 00000001
+│ PC: 0x00003008
+│ ADD        R2, R2, #10  [0x0004050A]
+│ Binary: 00000000 00000100 00000101 00001010
 │
 │ Operands BEFORE:
-│   R1 (A) = 0x00000004 (         4)
-│   R1 (B) = 0x00000004 (         4)
-│   C (immediate) = #1 (raw=0x01)
+│   R2 (A) = 0x00000000 (         0)
+│   R2 (B) = 0x00000000 (         0)
+│   C (immediate) = #10 (raw=0x0A)
 │
 │ Register CHANGES:
-│   R001: 0x00000004 -> 0x00000005
+│   R002: 0x00000000 -> 0x0000000A
 │ Memory changes: (none)
 │
-│ PC changed: 0x00003000 -> 0x00003004
+│ PC changed: 0x00003008 -> 0x0000300C
 └──────────────────────────────────────────────────────────────
 
 ┌─ Instruction #4 ─────────────────────────────────────────
-│ PC: 0x00003004
-│ JMP        R0, R0, #0  [0x7C000100]
-│ Binary: 01111100 00000000 00000001 00000000
+│ PC: 0x0000300C
+│ MUL        R2, R2, #2  [0x04040502]
+│ Binary: 00000100 00000100 00000101 00000010
+│
+│ Operands BEFORE:
+│   R2 (A) = 0x0000000A (        10)
+│   R2 (B) = 0x0000000A (        10)
+│   C (immediate) = #2 (raw=0x02)
+│
+│ Register CHANGES:
+│   R002: 0x0000000A -> 0x00000014
+│ Memory changes: (none)
+│
+│ PC changed: 0x0000300C -> 0x00003010
+└──────────────────────────────────────────────────────────────
+
+┌─ Instruction #5 ─────────────────────────────────────────
+│ PC: 0x00003010
+│ EXIT       R0, R0, #0  [0x82000100]
+│ Binary: 10000010 00000000 00000001 00000000
 │
 │ Operands BEFORE:
 │   R0 (A) = 0x00000005 (         5)
@@ -85,22 +94,67 @@ Registers hash at start: 0xD45F9B8D
 │ Register changes: (none)
 │ Memory changes: (none)
 │
-│ PC changed: 0x00003004 -> 0x00000000
+│ PC changed: 0x00003010 -> 0x00003014
 └──────────────────────────────────────────────────────────────
 
-INFO: Module build/programs/main.bin completed (PC=0x0)
-Module build/programs/main.bin: executed 2 instructions
-Registers hash at end: 0x1C109B91
-time_ms at end: 12942198 (delta: 1000 ms)
-VM elapsed this cycle: 0 ms
-=== CYCLE 2 END: 2 instructions in 0 ms ===
+Module build/bin/io.bin: executed 3 instructions
 
-=== CYCLE 3 START (time_ms=12942198) ===
-Registers hash at start: 0x1C109B91
+--- Executing module: build/bin/main.bin (0x3014) ---
+┌─ Instruction #6 ─────────────────────────────────────────
+│ PC: 0x00003014
+│ ADD        R0, R0, #1  [0x00000101]
+│ Binary: 00000000 00000000 00000001 00000001
+│
+│ Operands BEFORE:
+│   R0 (A) = 0x00000005 (         5)
+│   R0 (B) = 0x00000005 (         5)
+│   C (immediate) = #1 (raw=0x01)
+│
+│ Register CHANGES:
+│   R000: 0x00000005 -> 0x00000006
+│ Memory changes: (none)
+│
+│ PC changed: 0x00003014 -> 0x00003018
+└──────────────────────────────────────────────────────────────
 
---- Executing module: build/programs/main.bin (0x3000) ---
-┌─ Instruction #5 ─────────────────────────────────────────
-│ PC: 0x00003000
+┌─ Instruction #7 ─────────────────────────────────────────
+│ PC: 0x00003018
+│ ADD        R1, R1, #2  [0x00020302]
+│ Binary: 00000000 00000010 00000011 00000010
+│
+│ Operands BEFORE:
+│   R1 (A) = 0x00000003 (         3)
+│   R1 (B) = 0x00000003 (         3)
+│   C (immediate) = #2 (raw=0x02)
+│
+│ Register CHANGES:
+│   R001: 0x00000003 -> 0x00000005
+│ Memory changes: (none)
+│
+│ PC changed: 0x00003018 -> 0x0000301C
+└──────────────────────────────────────────────────────────────
+
+┌─ Instruction #8 ─────────────────────────────────────────
+│ PC: 0x0000301C
+│ EXIT       R0, R0, #0  [0x82000100]
+│ Binary: 10000010 00000000 00000001 00000000
+│
+│ Operands BEFORE:
+│   R0 (A) = 0x00000006 (         6)
+│   R0 (B) = 0x00000006 (         6)
+│   C (immediate) = #0 (raw=0x00)
+│
+│ Register changes: (none)
+│ Memory changes: (none)
+│
+│ PC changed: 0x0000301C -> 0x00003020
+└──────────────────────────────────────────────────────────────
+
+Module build/bin/main.bin: executed 3 instructions
+
+--- Executing module: build/bin/program_v1.bin (0x3020) ---
+┌─ Instruction #9 ─────────────────────────────────────────
+│ PC: 0x00003020
 │ ADD        R1, R1, #1  [0x00020301]
 │ Binary: 00000000 00000010 00000011 00000001
 │
@@ -113,163 +167,56 @@ Registers hash at start: 0x1C109B91
 │   R001: 0x00000005 -> 0x00000006
 │ Memory changes: (none)
 │
-│ PC changed: 0x00003000 -> 0x00003004
+│ PC changed: 0x00003020 -> 0x00003024
 └──────────────────────────────────────────────────────────────
 
-┌─ Instruction #6 ─────────────────────────────────────────
-│ PC: 0x00003004
+┌─ Instruction #10 ─────────────────────────────────────────
+│ PC: 0x00003024
 │ JMP        R0, R0, #0  [0x7C000100]
 │ Binary: 01111100 00000000 00000001 00000000
 │
 │ Operands BEFORE:
-│   R0 (A) = 0x00000005 (         5)
-│   R0 (B) = 0x00000005 (         5)
+│   R0 (A) = 0x00000006 (         6)
+│   R0 (B) = 0x00000006 (         6)
 │   C (immediate) = #0 (raw=0x00)
 │
 │ Register changes: (none)
 │ Memory changes: (none)
 │
-│ PC changed: 0x00003004 -> 0x00000000
+│ PC changed: 0x00003024 -> 0x00000000
 └──────────────────────────────────────────────────────────────
 
-INFO: Module build/programs/main.bin completed (PC=0x0)
-Module build/programs/main.bin: executed 2 instructions
-Registers hash at end: 0x9FB09DF4
-time_ms at end: 12943198 (delta: 1000 ms)
-VM elapsed this cycle: 0 ms
-=== CYCLE 3 END: 2 instructions in 0 ms ===
+INFO: Module build/bin/program_v1.bin completed (PC=0x0)
+Module build/bin/program_v1.bin: executed 2 instructions
 
-=== CYCLE 4 START (time_ms=12943198) ===
-Registers hash at start: 0x9FB09DF4
-
---- Executing module: build/programs/main.bin (0x3000) ---
-┌─ Instruction #7 ─────────────────────────────────────────
-│ PC: 0x00003000
-│ ADD        R1, R1, #1  [0x00020301]
-│ Binary: 00000000 00000010 00000011 00000001
+--- Executing module: build/bin/program_v2.bin (0x3028) ---
+┌─ Instruction #11 ─────────────────────────────────────────
+│ PC: 0x00003028
+│ ADD        R1, R1, #2  [0x00020302]
+│ Binary: 00000000 00000010 00000011 00000010
 │
 │ Operands BEFORE:
 │   R1 (A) = 0x00000006 (         6)
 │   R1 (B) = 0x00000006 (         6)
-│   C (immediate) = #1 (raw=0x01)
-│
-│ Register CHANGES:
-│   R001: 0x00000006 -> 0x00000007
-│ Memory changes: (none)
-│
-│ PC changed: 0x00003000 -> 0x00003004
-└──────────────────────────────────────────────────────────────
-
-┌─ Instruction #8 ─────────────────────────────────────────
-│ PC: 0x00003004
-│ JMP        R0, R0, #0  [0x7C000100]
-│ Binary: 01111100 00000000 00000001 00000000
-│
-│ Operands BEFORE:
-│   R0 (A) = 0x00000005 (         5)
-│   R0 (B) = 0x00000005 (         5)
-│   C (immediate) = #0 (raw=0x00)
-│
-│ Register changes: (none)
-│ Memory changes: (none)
-│
-│ PC changed: 0x00003004 -> 0x00000000
-└──────────────────────────────────────────────────────────────
-
-INFO: Module build/programs/main.bin completed (PC=0x0)
-Module build/programs/main.bin: executed 2 instructions
-Registers hash at end: 0x57FF9DE8
-time_ms at end: 12944198 (delta: 1000 ms)
-VM elapsed this cycle: 0 ms
-=== CYCLE 4 END: 2 instructions in 0 ms ===
-
-=== CYCLE 5 START (time_ms=12944198) ===
-Registers hash at start: 0x57FF9DE8
-
---- Executing module: build/programs/main.bin (0x3000) ---
-┌─ Instruction #9 ─────────────────────────────────────────
-│ PC: 0x00003000
-│ ADD        R1, R1, #2  [0x00020302]
-│ Binary: 00000000 00000010 00000011 00000010
-│
-│ Operands BEFORE:
-│   R1 (A) = 0x00000007 (         7)
-│   R1 (B) = 0x00000007 (         7)
 │   C (immediate) = #2 (raw=0x02)
 │
 │ Register CHANGES:
-│   R001: 0x00000007 -> 0x00000008
+│   R001: 0x00000006 -> 0x00000008
 │ Memory changes: (none)
 │
-│ PC changed: 0x00003000 -> 0x00003004
+│ PC changed: 0x00003028 -> 0x0000302C
 └──────────────────────────────────────────────────────────────
 
-INFO: Module build/programs/main.bin completed (PC=0x3004)
-Module build/programs/main.bin: executed 1 instructions
-Registers hash at end: 0xB74C88DA
-time_ms at end: 12945198 (delta: 1000 ms)
+INFO: Module build/bin/program_v2.bin completed (PC=0x302C)
+Module build/bin/program_v2.bin: executed 1 instructions
+Registers hash at end: 0x80130337
+time_ms at end: 15433041 (delta: 1000 ms)
 VM elapsed this cycle: 0 ms
-=== CYCLE 5 END: 1 instructions in 0 ms ===
-
-=== CYCLE 6 START (time_ms=12945198) ===
-Registers hash at start: 0xB74C88DA
-
---- Executing module: build/programs/main.bin (0x3000) ---
-┌─ Instruction #10 ─────────────────────────────────────────
-│ PC: 0x00003000
-│ ADD        R1, R1, #2  [0x00020302]
-│ Binary: 00000000 00000010 00000011 00000010
-│
-│ Operands BEFORE:
-│   R1 (A) = 0x00000008 (         8)
-│   R1 (B) = 0x00000008 (         8)
-│   C (immediate) = #2 (raw=0x02)
-│
-│ Register CHANGES:
-│   R001: 0x00000008 -> 0x00000009
-│ Memory changes: (none)
-│
-│ PC changed: 0x00003000 -> 0x00003004
-└──────────────────────────────────────────────────────────────
-
-INFO: Module build/programs/main.bin completed (PC=0x3004)
-Module build/programs/main.bin: executed 1 instructions
-Registers hash at end: 0x7F0388C6
-time_ms at end: 12946198 (delta: 1000 ms)
-VM elapsed this cycle: 0 ms
-=== CYCLE 6 END: 1 instructions in 0 ms ===
-
-=== CYCLE 7 START (time_ms=12946198) ===
-Registers hash at start: 0x7F0388C6
-
---- Executing module: build/programs/main.bin (0x3000) ---
-┌─ Instruction #11 ─────────────────────────────────────────
-│ PC: 0x00003000
-│ ADD        R1, R1, #2  [0x00020302]
-│ Binary: 00000000 00000010 00000011 00000010
-│
-│ Operands BEFORE:
-│   R1 (A) = 0x00000009 (         9)
-│   R1 (B) = 0x00000009 (         9)
-│   C (immediate) = #2 (raw=0x02)
-│
-│ Register CHANGES:
-│   R001: 0x00000009 -> 0x0000000A
-│ Memory changes: (none)
-│
-│ PC changed: 0x00003000 -> 0x00003004
-└──────────────────────────────────────────────────────────────
-
-INFO: Module build/programs/main.bin completed (PC=0x3004)
-Module build/programs/main.bin: executed 1 instructions
-Registers hash at end: 0xFCA38EA3
-time_ms at end: 12947198 (delta: 1000 ms)
-VM elapsed this cycle: 0 ms
-=== CYCLE 7 END: 1 instructions in 0 ms ===
+=== CYCLE 1 END: 11 instructions in 0 ms ===
 
 ╔═══════════════════════════════════════════════════════════════╗
 ║ Execution Summary
 ╠═══════════════════════════════════════════════════════════════╣
 ║ Total instructions executed: 11
-║ Final PC: 0x00003004
+║ Final PC: 0x0000302C
 ╚═══════════════════════════════════════════════════════════════╝
