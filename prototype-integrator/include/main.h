@@ -71,6 +71,23 @@ typedef struct {
     uint32_t preset;
 } CT_Counter;
 
+typedef struct {
+    uint64_t cycles_total;
+    uint64_t instructions_total;
+
+    uint64_t cycle_exec_ns_total;   // только выполнение цикла, без nanosleep
+    uint64_t instr_exec_ns_total;   // суммарное время всех инструкций
+
+    uint64_t fetch_ns_total;
+    uint64_t decode_ns_total;
+    uint64_t dispatch_ns_total;
+
+    uint64_t min_instr_ns;
+    uint64_t max_instr_ns;
+
+    uint64_t overrun_cycles;
+} vm_perf_stats_t;
+
 /* ===================== VM STATE ===================== */
 
 typedef struct vm_state {
@@ -125,6 +142,7 @@ typedef struct vm_state {
 
     /* --- debug --- */
     void *user_data;
+    vm_perf_stats_t perf;
 
     uint32_t dbg_prev_reg[REG_COUNT];
     uint8_t  dbg_prev_mem[MEM_LOG_SIZE];

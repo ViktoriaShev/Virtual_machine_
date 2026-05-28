@@ -56,10 +56,25 @@ static void vm_state_init_registers(vm_state_t *vm) {
     for (size_t i = 0; i < REG_COUNT; ++i) {
         vm->reg[i] = 0;
     }
+}
 
-    /* старое поведение */
-    if (REG_COUNT > 0) vm->reg[0] = 5;
-    if (REG_COUNT > 1) vm->reg[1] = 3;
+void vm_perf_stats_init(vm_perf_stats_t *s) {
+    if (!s) return;
+
+    s->cycles_total = 0;
+    s->instructions_total = 0;
+
+    s->cycle_exec_ns_total = 0;
+    s->instr_exec_ns_total = 0;
+
+    s->fetch_ns_total = 0;
+    s->decode_ns_total = 0;
+    s->dispatch_ns_total = 0;
+
+    s->min_instr_ns = UINT64_MAX;
+    s->max_instr_ns = 0;
+
+    s->overrun_cycles = 0;
 }
 
 static void vm_state_clear_iec_state(vm_state_t *vm) {
@@ -139,6 +154,7 @@ static void vm_state_init_common(vm_state_t *vm) {
     vm->config.enable_tick_timing = false;
     vm->config.hash_algo = HASH_CRC32;
 
+    
     vm->logging_enabled = true;
     vm->verbose_logging = false;
 
@@ -151,6 +167,7 @@ static void vm_state_init_common(vm_state_t *vm) {
     memset(vm->dbg_prev_reg, 0, sizeof(vm->dbg_prev_reg));
     memset(vm->dbg_prev_mem, 0, sizeof(vm->dbg_prev_mem));
 
+    vm_perf_stats_init(&vm->perf);
     clock_gettime(CLOCK_MONOTONIC, &vm->last_tick_time);
 }
 
@@ -180,6 +197,7 @@ static void vm_state_reset_runtime(vm_state_t *vm) {
     memset(vm->edge_prev_rising, 0, sizeof(vm->edge_prev_rising));
     memset(vm->edge_prev_falling, 0, sizeof(vm->edge_prev_falling));
     memset(vm->edge_prev_both, 0, sizeof(vm->edge_prev_both));
+    vm_perf_stats_init(&vm->perf);
 
     clock_gettime(CLOCK_MONOTONIC, &vm->last_tick_time);
 }

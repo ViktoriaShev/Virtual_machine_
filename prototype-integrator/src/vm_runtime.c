@@ -55,6 +55,15 @@ static void vm_update_time_after_instruction(vm_state_t *vm) {
     }
 }
 
+static inline uint64_t ts_to_ns(const struct timespec *t) {
+    return (uint64_t)t->tv_sec * 1000000000ULL + (uint64_t)t->tv_nsec;
+}
+
+static inline uint64_t ts_diff_ns(const struct timespec *start,
+                                  const struct timespec *end) {
+    return ts_to_ns(end) - ts_to_ns(start);
+}
+
 /* --------------------------------------------------------------------------
    Выполнение одной инструкции
    return:
@@ -77,6 +86,10 @@ static int vm_run_instruction(vm_state_t *vm,
         return 1;
     }
 
+    struct timespec t0, t1, t2, t3;
+    
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+
     uint32_t instr = vm_mr32(vm, vm->PC);
     if (instr == 0) {
         if (vm->logging_enabled && vm->log_file) {
@@ -86,6 +99,8 @@ static int vm_run_instruction(vm_state_t *vm,
         return 1;
     }
 
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+
     decoded_instr_t *d = vm_decode_instruction(vm, vm->PC);
     if (!d) {
         printf("Cycle %u, Module %s: Failed to decode at PC=0x%X\n",
@@ -93,6 +108,8 @@ static int vm_run_instruction(vm_state_t *vm,
         vm->running = false;
         return 1;
     }
+
+    clock_gettime(CLOCK_MONOTONIC, &t2);
 
     uint8_t opcode = OPC(instr);
     if (opcode >= OPCODE_COUNT || vm->op_ex[opcode] == NULL) {
@@ -110,6 +127,26 @@ static int vm_run_instruction(vm_state_t *vm,
         vm->PC += 4;
     }
     log_after(vm, vm->PC);
+
+    clock_gettime(CLOCK_MONOTONIC, &t3);
+
+    uint64_t fetch_ns    = ts_diff_ns(&t0, &t1);
+    uint64_t decode_ns   = ts_diff_ns(&t1, &t2);
+    uint64_t dispatch_ns = ts_diff_ns(&t2, &t3);
+    uint64_t total_ns    = ts_diff_ns(&t0, &t3);
+
+    vm->perf.instructions_total++;
+    vm->perf.instr_exec_ns_total += total_ns;
+    vm->perf.fetch_ns_total += fetch_ns;
+    vm->perf.decode_ns_total += decode_ns;
+    vm->perf.dispatch_ns_total += dispatch_ns;
+
+    if (vm->perf.min_instr_ns == 0 || total_ns < vm->perf.min_instr_ns) {
+        vm->perf.min_instr_ns = total_ns;
+    }
+    if (total_ns > vm->perf.max_instr_ns) {
+        vm->perf.max_instr_ns = total_ns;
+    }
 
     (*instr_count)++;
     (*total_instr_count)++;
@@ -292,6 +329,11 @@ int run_program(vm_state_t *vm) {
                elapsed_ms,
                (unsigned long long)vm->time_ms);
 
+        struct timespec cycle_exec_end;
+        clock_gettime(CLOCK_MONOTONIC, &cycle_exec_end);
+        vm->perf.cycle_exec_ns_total += ts_diff_ns(&cycle_start, &cycle_exec_end);
+        vm->perf.cycles_total++;
+
         if (remaining_ms > 0) {
             struct timespec sleep_time;
             sleep_time.tv_sec = remaining_ms / 1000;
@@ -300,9 +342,13 @@ int run_program(vm_state_t *vm) {
         } else if (vm->config.enable_cycle_check) {
             printf("!!! WARNING: Cycle %u overrun by %ld ms\n",
                    vm->cycle_count, -remaining_ms);
+                    vm->perf.overrun_cycles++;
         }
-    }
 
+        
+    }
+    
+    vm_print_perf_summary(vm);
     close_logging(vm);
     return 0;
 }

@@ -1,5 +1,5 @@
 ╔═══════════════════════════════════════════════════════════════╗
-║           VM32 Execution Log - Tue May 12 16:11:32 2026
+║           VM32 Execution Log - Thu May 28 15:42:11 2026
 ╠═══════════════════════════════════════════════════════════════╣
 ║ Memory: 67108864 bytes (64.00 MB)
 ║ Registers: 256
@@ -7,22 +7,22 @@
 ╚═══════════════════════════════════════════════════════════════╝
 
 
-=== CYCLE 1 START (time_ms=15432041) ===
-Registers hash at start: 0xC021911A
+=== CYCLE 1 START (time_ms=9219948) ===
+Registers hash at start: 0xEFB5AF2E
 
---- Executing module: build/bin/control.bin (0x3000) ---
+--- Executing module: build/bin/general_exmpl.bin (0x3000) ---
 ┌─ Instruction #1 ─────────────────────────────────────────
 │ PC: 0x00003000
-│ SUB        R3, R3, #5  [0x02060705]
-│ Binary: 00000010 00000110 00000111 00000101
+│ ADD        R1, R0, #1  [0x00020101]
+│ Binary: 00000000 00000010 00000001 00000001
 │
 │ Operands BEFORE:
-│   R3 (A) = 0x00000000 (         0)
-│   R3 (B) = 0x00000000 (         0)
-│   C (immediate) = #5 (raw=0x05)
+│   R1 (A) = 0x00000000 (         0)
+│   R0 (B) = 0x00000000 (         0)
+│   C (immediate) = #1 (raw=0x01)
 │
 │ Register CHANGES:
-│   R003: 0x00000000 -> 0xFFFFFFFB
+│   R001: 0x00000000 -> 0x00000001
 │ Memory changes: (none)
 │
 │ PC changed: 0x00003000 -> 0x00003004
@@ -30,35 +30,33 @@ Registers hash at start: 0xC021911A
 
 ┌─ Instruction #2 ─────────────────────────────────────────
 │ PC: 0x00003004
-│ EXIT       R0, R0, #0  [0x82000100]
-│ Binary: 10000010 00000000 00000001 00000000
+│ ADD        R2, R0, #50  [0x00040132]
+│ Binary: 00000000 00000100 00000001 00110010
 │
 │ Operands BEFORE:
-│   R0 (A) = 0x00000005 (         5)
-│   R0 (B) = 0x00000005 (         5)
-│   C (immediate) = #0 (raw=0x00)
+│   R2 (A) = 0x00000000 (         0)
+│   R0 (B) = 0x00000000 (         0)
+│   C (immediate) = #50 (raw=0x32)
 │
-│ Register changes: (none)
+│ Register CHANGES:
+│   R002: 0x00000000 -> 0x00000032
 │ Memory changes: (none)
 │
 │ PC changed: 0x00003004 -> 0x00003008
 └──────────────────────────────────────────────────────────────
 
-Module build/bin/control.bin: executed 2 instructions
-
---- Executing module: build/bin/io.bin (0x3008) ---
 ┌─ Instruction #3 ─────────────────────────────────────────
 │ PC: 0x00003008
-│ ADD        R2, R2, #10  [0x0004050A]
-│ Binary: 00000000 00000100 00000101 00001010
+│ ADD        R3, R0, #10  [0x0006010A]
+│ Binary: 00000000 00000110 00000001 00001010
 │
 │ Operands BEFORE:
-│   R2 (A) = 0x00000000 (         0)
-│   R2 (B) = 0x00000000 (         0)
+│   R3 (A) = 0x00000000 (         0)
+│   R0 (B) = 0x00000000 (         0)
 │   C (immediate) = #10 (raw=0x0A)
 │
 │ Register CHANGES:
-│   R002: 0x00000000 -> 0x0000000A
+│   R003: 0x00000000 -> 0x0000000A
 │ Memory changes: (none)
 │
 │ PC changed: 0x00003008 -> 0x0000300C
@@ -66,16 +64,16 @@ Module build/bin/control.bin: executed 2 instructions
 
 ┌─ Instruction #4 ─────────────────────────────────────────
 │ PC: 0x0000300C
-│ MUL        R2, R2, #2  [0x04040502]
-│ Binary: 00000100 00000100 00000101 00000010
+│ RISING_EDGE R10, R1, #0  [0x70140300]
+│ Binary: 01110000 00010100 00000011 00000000
 │
 │ Operands BEFORE:
-│   R2 (A) = 0x0000000A (        10)
-│   R2 (B) = 0x0000000A (        10)
-│   C (immediate) = #2 (raw=0x02)
+│   R10 (A) = 0x00000000 (         0)
+│   R1 (B) = 0x00000001 (         1)
+│   C (immediate) = #0 (raw=0x00)
 │
 │ Register CHANGES:
-│   R002: 0x0000000A -> 0x00000014
+│   R010: 0x00000000 -> 0x00000001
 │ Memory changes: (none)
 │
 │ PC changed: 0x0000300C -> 0x00003010
@@ -83,13 +81,13 @@ Module build/bin/control.bin: executed 2 instructions
 
 ┌─ Instruction #5 ─────────────────────────────────────────
 │ PC: 0x00003010
-│ EXIT       R0, R0, #0  [0x82000100]
-│ Binary: 10000010 00000000 00000001 00000000
+│ TON        R11, R10, #1  [0x5E161501]
+│ Binary: 01011110 00010110 00010101 00000001
 │
 │ Operands BEFORE:
-│   R0 (A) = 0x00000005 (         5)
-│   R0 (B) = 0x00000005 (         5)
-│   C (immediate) = #0 (raw=0x00)
+│   R11 (A) = 0x00000000 (         0)
+│   R10 (B) = 0x00000001 (         1)
+│   C (immediate) = #1 (raw=0x01)
 │
 │ Register changes: (none)
 │ Memory changes: (none)
@@ -97,21 +95,18 @@ Module build/bin/control.bin: executed 2 instructions
 │ PC changed: 0x00003010 -> 0x00003014
 └──────────────────────────────────────────────────────────────
 
-Module build/bin/io.bin: executed 3 instructions
-
---- Executing module: build/bin/main.bin (0x3014) ---
 ┌─ Instruction #6 ─────────────────────────────────────────
 │ PC: 0x00003014
-│ ADD        R0, R0, #1  [0x00000101]
-│ Binary: 00000000 00000000 00000001 00000001
+│ ADD        R4, R0, #5  [0x00080105]
+│ Binary: 00000000 00001000 00000001 00000101
 │
 │ Operands BEFORE:
-│   R0 (A) = 0x00000005 (         5)
-│   R0 (B) = 0x00000005 (         5)
-│   C (immediate) = #1 (raw=0x01)
+│   R4 (A) = 0x00000000 (         0)
+│   R0 (B) = 0x00000000 (         0)
+│   C (immediate) = #5 (raw=0x05)
 │
 │ Register CHANGES:
-│   R000: 0x00000005 -> 0x00000006
+│   R004: 0x00000000 -> 0x00000005
 │ Memory changes: (none)
 │
 │ PC changed: 0x00003014 -> 0x00003018
@@ -119,16 +114,15 @@ Module build/bin/io.bin: executed 3 instructions
 
 ┌─ Instruction #7 ─────────────────────────────────────────
 │ PC: 0x00003018
-│ ADD        R1, R1, #2  [0x00020302]
-│ Binary: 00000000 00000010 00000011 00000010
+│ MUL        R4, R4, R1  [0x04080801]
+│ Binary: 00000100 00001000 00001000 00000001
 │
 │ Operands BEFORE:
-│   R1 (A) = 0x00000003 (         3)
-│   R1 (B) = 0x00000003 (         3)
-│   C (immediate) = #2 (raw=0x02)
+│   R4 (A) = 0x00000005 (         5)
+│   R4 (B) = 0x00000005 (         5)
+│   R1 (C) = 0x00000001 (         1)
 │
-│ Register CHANGES:
-│   R001: 0x00000003 -> 0x00000005
+│ Register changes: (none)
 │ Memory changes: (none)
 │
 │ PC changed: 0x00003018 -> 0x0000301C
@@ -136,13 +130,13 @@ Module build/bin/io.bin: executed 3 instructions
 
 ┌─ Instruction #8 ─────────────────────────────────────────
 │ PC: 0x0000301C
-│ EXIT       R0, R0, #0  [0x82000100]
-│ Binary: 10000010 00000000 00000001 00000000
+│ GT         R12, R4, R3  [0x2E180803]
+│ Binary: 00101110 00011000 00001000 00000011
 │
 │ Operands BEFORE:
-│   R0 (A) = 0x00000006 (         6)
-│   R0 (B) = 0x00000006 (         6)
-│   C (immediate) = #0 (raw=0x00)
+│   R12 (A) = 0x00000000 (         0)
+│   R4 (B) = 0x00000005 (         5)
+│   R3 (C) = 0x0000000A (        10)
 │
 │ Register changes: (none)
 │ Memory changes: (none)
@@ -150,21 +144,17 @@ Module build/bin/io.bin: executed 3 instructions
 │ PC changed: 0x0000301C -> 0x00003020
 └──────────────────────────────────────────────────────────────
 
-Module build/bin/main.bin: executed 3 instructions
-
---- Executing module: build/bin/program_v1.bin (0x3020) ---
 ┌─ Instruction #9 ─────────────────────────────────────────
 │ PC: 0x00003020
-│ ADD        R1, R1, #1  [0x00020301]
-│ Binary: 00000000 00000010 00000011 00000001
+│ RS_LATCH   R13, R11, R12  [0x761A160C]
+│ Binary: 01110110 00011010 00010110 00001100
 │
 │ Operands BEFORE:
-│   R1 (A) = 0x00000005 (         5)
-│   R1 (B) = 0x00000005 (         5)
-│   C (immediate) = #1 (raw=0x01)
+│   R13 (A) = 0x00000000 (         0)
+│   R11 (B) = 0x00000000 (         0)
+│   R12 (C) = 0x00000000 (         0)
 │
-│ Register CHANGES:
-│   R001: 0x00000005 -> 0x00000006
+│ Register changes: (none)
 │ Memory changes: (none)
 │
 │ PC changed: 0x00003020 -> 0x00003024
@@ -172,45 +162,39 @@ Module build/bin/main.bin: executed 3 instructions
 
 ┌─ Instruction #10 ─────────────────────────────────────────
 │ PC: 0x00003024
-│ JMP        R0, R0, #0  [0x7C000100]
-│ Binary: 01111100 00000000 00000001 00000000
+│ JMP_IF     R0, R100, R13  [0x7E00C80D]
+│ Binary: 01111110 00000000 11001000 00001101
 │
 │ Operands BEFORE:
-│   R0 (A) = 0x00000006 (         6)
-│   R0 (B) = 0x00000006 (         6)
-│   C (immediate) = #0 (raw=0x00)
+│   R0 (A) = 0x00000000 (         0)
+│   R100 (B) = 0x00000000 (         0)
+│   R13 (C) = 0x00000000 (         0)
 │
 │ Register changes: (none)
 │ Memory changes: (none)
 │
-│ PC changed: 0x00003024 -> 0x00000000
+│ PC changed: 0x00003024 -> 0x00003028
 └──────────────────────────────────────────────────────────────
 
-INFO: Module build/bin/program_v1.bin completed (PC=0x0)
-Module build/bin/program_v1.bin: executed 2 instructions
-
---- Executing module: build/bin/program_v2.bin (0x3028) ---
 ┌─ Instruction #11 ─────────────────────────────────────────
 │ PC: 0x00003028
-│ ADD        R1, R1, #2  [0x00020302]
-│ Binary: 00000000 00000010 00000011 00000010
+│ EXIT       R0, R0, R0  [0x82000000]
+│ Binary: 10000010 00000000 00000000 00000000
 │
 │ Operands BEFORE:
-│   R1 (A) = 0x00000006 (         6)
-│   R1 (B) = 0x00000006 (         6)
-│   C (immediate) = #2 (raw=0x02)
+│   R0 (A) = 0x00000000 (         0)
+│   R0 (B) = 0x00000000 (         0)
+│   R0 (C) = 0x00000000 (         0)
 │
-│ Register CHANGES:
-│   R001: 0x00000006 -> 0x00000008
+│ Register changes: (none)
 │ Memory changes: (none)
 │
 │ PC changed: 0x00003028 -> 0x0000302C
 └──────────────────────────────────────────────────────────────
 
-INFO: Module build/bin/program_v2.bin completed (PC=0x302C)
-Module build/bin/program_v2.bin: executed 1 instructions
-Registers hash at end: 0x80130337
-time_ms at end: 15433041 (delta: 1000 ms)
+Module build/bin/general_exmpl.bin: executed 11 instructions
+Registers hash at end: 0xCF0DFD42
+time_ms at end: 9220948 (delta: 1000 ms)
 VM elapsed this cycle: 0 ms
 === CYCLE 1 END: 11 instructions in 0 ms ===
 

@@ -300,6 +300,46 @@ void log_after(vm_state_t *vm, uint32_t pc) {
     fflush(vm->log_file);
 }
 
+void vm_print_perf_summary(vm_state_t *vm) {
+    if (!vm) return;
+
+    double total_instr = (double)vm->perf.instructions_total;
+    double avg_instr_ns = total_instr > 0.0
+        ? (double)vm->perf.instr_exec_ns_total / total_instr
+        : 0.0;
+
+    double avg_cycle_ms = vm->perf.cycles_total > 0
+        ? (double)vm->perf.cycle_exec_ns_total / (double)vm->perf.cycles_total / 1e6
+        : 0.0;
+
+    double avg_fetch_ns = total_instr > 0.0
+        ? (double)vm->perf.fetch_ns_total / total_instr
+        : 0.0;
+
+    double avg_decode_ns = total_instr > 0.0
+        ? (double)vm->perf.decode_ns_total / total_instr
+        : 0.0;
+
+    double avg_dispatch_ns = total_instr > 0.0
+        ? (double)vm->perf.dispatch_ns_total / total_instr
+        : 0.0;
+
+    printf("\n=== VM32 Performance Summary ===\n");
+    printf("Cycles: %llu\n", (unsigned long long)vm->perf.cycles_total);
+    printf("Instructions: %llu\n", (unsigned long long)vm->perf.instructions_total);
+    printf("Cycle execution time total: %.3f ms\n",
+           (double)vm->perf.cycle_exec_ns_total / 1e6);
+    printf("Average cycle execution time: %.3f ms\n", avg_cycle_ms);
+    printf("Average instruction time: %.3f us\n", avg_instr_ns / 1000.0);
+    printf("Min instruction time: %.3f us\n", (double)vm->perf.min_instr_ns / 1000.0);
+    printf("Max instruction time: %.3f us\n", (double)vm->perf.max_instr_ns / 1000.0);
+    printf("Average fetch time: %.3f us\n", avg_fetch_ns / 1000.0);
+    printf("Average decode time: %.3f us\n", avg_decode_ns / 1000.0);
+    printf("Average dispatch time: %.3f us\n", avg_dispatch_ns / 1000.0);
+    printf("Cycle overruns: %llu\n", (unsigned long long)vm->perf.overrun_cycles);
+    printf("================================\n");
+}
+
 /* Закрытие логов */
 void close_logging(vm_state_t *vm) {
     if (!vm || !vm->log_file) return;
@@ -314,3 +354,4 @@ void close_logging(vm_state_t *vm) {
     fclose(vm->log_file);
     vm->log_file = NULL;
 }
+
