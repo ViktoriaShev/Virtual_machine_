@@ -94,7 +94,6 @@ static OpEntry op_table[] = {
     {"sel",54, CFLAG_C_MUST_REG},
     {"mux",55, CFLAG_ALLOW_IMM},
 
-    /* NEW IEC/SCADA ops (added) */
     {"rising_edge",56, CFLAG_ALLOW_IMM},
     {"falling_edge",57, CFLAG_ALLOW_IMM},
     {"edge_both",58, CFLAG_ALLOW_IMM},
